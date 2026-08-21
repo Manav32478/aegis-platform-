@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.local
+*.pem
+*.key
+.DS_Store
+dist/
+build/
+coverage/
+terraform.tfvars
+.terraform/
+*.tfstate
+*.tfstate.backup
+demo/history.jsonl

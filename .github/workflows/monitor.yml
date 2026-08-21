@@ -1,0 +1,29 @@
+# Health monitor — Month 3.3
+# NOTE ON FREE TIER: a */5 cron on a PRIVATE repo can exceed GitHub's free
+# 2,000 Actions minutes/month. Either keep the repo PUBLIC (unlimited free
+# minutes) or use the Cloudflare Worker cron in orchestration/router/ instead.
+name: Health monitor
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+        working-directory: orchestration
+      - run: node monitor.js
+        working-directory: orchestration
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TARGETS: ${{ secrets.TARGETS }}
+          # self-healing (Month 3.5) — a PAT with workflow scope
+          GITHUB_TOKEN: ${{ secrets.SELF_HEAL_TOKEN }}
+          GITHUB_REPO: ${{ github.repository }}

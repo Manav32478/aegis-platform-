@@ -1,0 +1,11 @@
+{
+  "name": "aegis-tests",
+  "version": "1.0.0",
+  "description": "Unit + integration tests for Aegis core logic",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}

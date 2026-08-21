@@ -1,0 +1,12 @@
+name = "aegis-router"
+main = "src/worker.js"
+compatibility_date = "2024-11-01"
+
+# Cron trigger — runs the health monitor every 5 minutes, for free,
+# with no GitHub Actions minute limits.
+[triggers]
+crons = ["*/5 * * * *"]
+
+# Set Supabase via secrets (run these once):
+#   wrangler secret put SUPABASE_URL
+#   wrangler secret put SUPABASE_KEY

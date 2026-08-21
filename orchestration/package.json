@@ -1,0 +1,9 @@
+{
+  "name": "aegis-orchestration",
+  "version": "1.0.0",
+  "description": "Health monitor + failover router for Aegis (zero-dependency monitor)",
+  "main": "monitor.js",
+  "scripts": {
+    "start": "node monitor.js"
+  }
+}

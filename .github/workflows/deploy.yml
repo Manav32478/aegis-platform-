@@ -1,0 +1,74 @@
+# Deploy pipeline — Month 2.7
+# GCP deploys automatically on push to main. Oracle is manual (SSH) — an example is
+# included but disabled. Render auto-deploys from GitHub once you connect the repo.
+name: Deploy to all clouds
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+        working-directory: tests
+      - run: npm test
+        working-directory: tests
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy — container/app scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: app/
+      - name: Checkov — IaC scan
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infra/
+
+  deploy-gcp:
+    needs: [test, security-scan]
+    # Auto-skips until you add the GCP_SA_KEY secret (keeps the Actions tab green).
+    if: ${{ secrets.GCP_SA_KEY != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Deploy to Cloud Run
+        run: |
+          cd app
+          gcloud run deploy aegis-app-gcp \
+            --source . \
+            --region us-central1 \
+            --allow-unauthenticated \
+            --set-env-vars CLOUD_NAME=google-cloud-run
+
+  # Oracle deploy example — enable when you have a VM + SSH key secret.
+  deploy-oracle:
+    needs: [test, security-scan]
+    if: false   # set to true once GCP_ORACLE_SSH_KEY secret exists
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ORACLE_VM_IP }}
+          username: ubuntu
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          script: |
+            cd ~/aegis-platform && git pull
+            cd app && sudo docker build -t aegis-app .
+            sudo docker rm -f aegis-app || true
+            sudo docker run -d -p 80:3000 -e CLOUD_NAME=oracle-cloud --name aegis-app --restart unless-stopped aegis-app
