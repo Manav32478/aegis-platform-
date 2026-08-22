@@ -4,15 +4,6 @@ A 6-month college major project: a platform that runs one app across **3 cloud f
 
 **The whole thing runs on free tiers — $0 cost.**
 
-> ⚡ **Evaluation in 4 days?** Read `docs/4-DAY_SPRINT.md` (day-by-day plan) and
-> `docs/DEMO_SCRIPT.md` (the exact 4-minute demo). Present with
-> `docs/EVAL1_presentation.pptx`. Launch the demo by double-clicking `run-demo.bat`
-> (Windows) or `./run-demo.sh` (Mac/Linux).
-
-> ✨ **One-page showcase** — open `showcase.html` in any browser for a professional
-> dark-theme overview of the whole project (live cloud status, architecture,
-> intelligence, roadmap). Works online (reads live Supabase data) and offline.
-
 > 🎛️ **ONE thing to run — `dashboard.html`.** Double-click it and EVERYTHING is there:
 > live status, monitoring charts, cost/carbon/security intelligence, a **failover demo**,
 > a **live ML Lab** (a real in-browser Isolation Forest), an **API explorer**, the
