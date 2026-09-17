@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aegis — Self-Healing Multi-Cloud Platform</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="/assets/aegis.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="/"><span class="logo">🛡️</span> Aegis</a>
+  <nav class="nav">
+    <a href="/" class="active">Overview</a>
+    <a href="/dashboard.html">Dashboard</a>
+    <a href="/status.html">Public Status</a>
+    <a href="/admin.html">Admin</a>
+  </nav>
+  <button class="theme-toggle" id="theme-btn" title="Toggle theme" onclick="Aegis.toggleTheme()">☀️</button>
+</header>
+
+<div class="wrap">
+  <section class="hero">
+    <span class="kicker">◈ Self-healing · multi-cloud · free-tier native</span>
+    <h1>Keep your app <span class="grad">alive across three clouds</span>, automatically.</h1>
+    <p class="lead">
+      Aegis continuously monitors your application running on Render, Vercel and
+      Cloud Run, detects failures <em>before</em> users notice, reroutes traffic to the
+      healthiest cloud, and redeploys the broken one — all on ₹0 cloud free tiers.
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="/dashboard.html">Open Live Dashboard →</a>
+      <a class="btn" href="/status.html">Public Status Page</a>
+      <a class="btn ghost" href="https://github.com/Manav32478/aegis-platform-" target="_blank" rel="noopener">Source on GitHub ↗</a>
+    </div>
+    <p class="small muted" style="margin-top:18px" id="live-summary">Loading live system summary…</p>
+  </section>
+
+  <div class="grid cols-4" id="hero-stats"></div>
+
+  <div class="section-head">
+    <h2>What the platform does</h2>
+    <span class="badge-live">Live · multi-region</span>
+  </div>
+  <div class="grid cols-3" id="feature-grid"></div>
+
+  <div class="section-head"><h2>How it works</h2></div>
+  <div class="grid cols-3">
+    <div class="card"><h3>1 · Probe every 5 minutes</h3><p class="muted">A monitor runs from three independent vantage points (Cloudflare edge, GitHub Actions, Oracle VM) and hits each cloud's <span class="mono">/health</span> endpoint, recording latency + status into Supabase.</p></div>
+    <div class="card"><h3>2 · Score &amp; decide</h3><p class="muted">Every cloud gets a composite health score (uptime + latency + error rate). The router sends traffic to the highest scorer; the runner-up is held as a warm failover.</p></div>
+    <div class="card"><h3>3 · Heal automatically</h3><p class="muted">If a cloud fails N checks in a row, Aegis logs an incident, fires an alert (Slack/webhook) and triggers a redeploy of that cloud via GitHub Actions — no human needed.</p></div>
+  </div>
+
+  <div class="section-head"><h2>Architecture at a glance</h2></div>
+  <div class="grid cols-2">
+    <div class="card">
+      <h3>🧩 Microservices</h3>
+      <table>
+        <tbody id="arch-services"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h3>☁️ Why 3 clouds?</h3>
+      <ul class="muted" style="margin:8px 0 0;padding-left:20px">
+        <li><strong>No single point of failure</strong> — one provider outage is invisible to users.</li>
+        <li><strong>Vendor independence</strong> — no lock-in to one free tier.</li>
+        <li><strong>Genuinely free</strong> — each cloud's free tier covers the workload.</li>
+        <li><strong>Measurable evidence</strong> — uptime %, latency, incidents, failover events.</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>
+    <span>Aegis · Self-Healing Multi-Cloud Platform · Major Project (6 months)</span>
+    <span>Render + Vercel + Cloud Run · Cloudflare · Supabase · ₹0/month</span>
+  </footer>
+</div>
+
+<script src="/assets/aegis.js"></script>
+<script>
+(function () {
+  const FEATURES = [
+    { icon: '📡', title: 'Multi-region monitoring', body: 'Latency, uptime %, p50/p90/p95/p99 and error rate per cloud, sampled continuously.' },
+    { icon: '🔮', title: 'Predictive failover', body: 'Isolation Forest (ML) + rolling-statistics detector flag a degrading cloud before it fails.' },
+    { icon: '🚦', title: 'Smart routing', body: 'The router always sends traffic to the healthiest cloud and fails over in real time.' },
+    { icon: '🔧', title: 'Self-healing', body: 'A cloud that fails N checks in a row is redeployed automatically via GitHub Actions.' },
+    { icon: '🚨', title: 'Alerting', body: 'Down / recovered / degraded events push to Slack or any webhook, and are logged.' },
+    { icon: '💸', title: 'Cost intelligence', body: '₹0/month operation with a 12-month forecast of your avoided single-cloud bill.' },
+    { icon: '🌱', title: 'Carbon awareness', body: 'Routes compute toward regions with lower grid carbon intensity (green routing).' },
+    { icon: '🔐', title: 'Security & tenancy', body: 'API-key auth, rate limiting, audit log, Trivy + Checkov + OPA scans in CI.' },
+    { icon: '📊', title: 'Reports & tests', body: 'Automated daily/weekly health reports plus a unit-tested intelligence layer.' },
+  ];
+
+  function renderFeatures() {
+    document.getElementById('feature-grid').innerHTML = FEATURES.map(f =>
+      '<div class="card"><h3>' + f.icon + ' ' + f.title + '</h3><p class="muted">' + f.body + '</p></div>'
+    ).join('');
+  }
+
+  function renderServices() {
+    const rows = [
+      ['web', 'Portal (landing + dashboard + status + admin)', 'Express', ':3100'],
+      ['api', 'Multi-tenant API + Swagger + keys + rate limiting', 'Express', ':4000'],
+      ['monitor', 'Health monitor + self-heal + alerts + reports', 'Node (zero-dep)', 'cron'],
+      ['router', 'Failover router at the edge', 'Cloudflare Worker', 'edge'],
+      ['ml', 'Predictive anomaly detection', 'Python + scikit-learn', 'CI job'],
+      ['store', 'Health history, incidents, alerts, keys, audit', 'Supabase Postgres', 'REST'],
+    ];
+    document.getElementById('arch-services').innerHTML = rows.map(r =>
+      '<tr><td class="mono">' + r[0] + '</td><td>' + r[1] + '</td><td class="muted">' + r[2] + '</td><td class="mono muted">' + r[3] + '</td></tr>'
+    ).join('');
+  }
+
+  async function hydrate(d) {
+    const names = Object.keys(d.analytics || {});
+    const up = names.filter(n => (d.analytics[n]?.healthy || 0) > (d.analytics[n]?.checks || 0) * 0.5).length;
+    document.getElementById('live-summary').innerHTML =
+      'Live right now: <strong>' + names.length + ' clouds</strong> monitored · ' +
+      '<strong>' + d.totalChecks + '</strong> checks recorded · route → <strong>' +
+      (d.route && d.route.route ? d.route.route : 'none') + '</strong>.';
+    const stats = [
+      { v: d.totalChecks, l: 'health checks recorded' },
+      { v: names.length, l: 'clouds monitored' },
+      { v: (d.incidents || []).length, l: 'incidents tracked' },
+      { v: d.cost.savedUsd + '/mo', l: 'estimated savings' },
+    ];
+    document.getElementById('hero-stats').innerHTML = stats.map(s =>
+      '<div class="card stat"><span class="value">' + s.v + '</span><span class="label">' + s.l + '</span></div>'
+    ).join('');
+  }
+
+  renderFeatures();
+  renderServices();
+  Aegis.on('aegis:data', hydrate);
+  Aegis.startLive();
+  Aegis.load().catch((e) => {
+    document.getElementById('live-summary').textContent = 'Could not reach live data — the demo still shows static content.';
+    document.getElementById('hero-stats').innerHTML =
+      '<div class="card stat"><span class="value">—</span><span class="label">server offline</span></div>';
+  });
+})();
+</script>
+</body>
+</html>

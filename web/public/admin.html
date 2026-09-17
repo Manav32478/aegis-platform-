@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aegis Admin — Targets, Keys, Audit</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="/assets/aegis.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="/"><span class="logo">🛡️</span> Aegis</a>
+  <nav class="nav">
+    <a href="/">Overview</a>
+    <a href="/dashboard.html">Dashboard</a>
+    <a href="/status.html">Public Status</a>
+    <a href="/admin.html" class="active">Admin</a>
+  </nav>
+  <button class="theme-toggle" id="theme-btn" title="Toggle theme" onclick="Aegis.toggleTheme()">☀️</button>
+</header>
+
+<div class="wrap">
+  <div class="section-head" style="margin-top:8px">
+    <div>
+      <h1 style="font-size:26px;margin-bottom:2px">Administration</h1>
+      <span class="muted small">protected by <span class="mono">x-admin-token</span> — set <kbd>ADMIN_TOKEN</kbd> when starting the server</span>
+    </div>
+  </div>
+
+  <!-- Admin token -->
+  <div class="card" id="token-card">
+    <h3>🔐 Admin token</h3>
+    <div class="sub">Most actions on this page require the admin token.</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <input id="admin-token" type="password" placeholder="paste ADMIN_TOKEN here" style="max-width:320px">
+      <button class="btn primary" onclick="saveToken()">Save token</button>
+    </div>
+    <p class="muted small" id="token-status">To enable admin actions, start the server with <kbd>ADMIN_TOKEN=yourpassword node server.js</kbd>.</p>
+  </div>
+
+  <div class="section-head"><h2>Monitored targets</h2></div>
+  <div class="card">
+    <table>
+      <thead><tr><th>Cloud</th><th>URL</th><th>Region</th><th>Enabled</th><th></th></tr></thead>
+      <tbody id="targets-body"><tr><td class="muted">loading…</td></tr></tbody>
+    </table>
+    <hr class="hr">
+    <h3>➕ Add a target (e.g. your Oracle VM or Cloud Run)</h3>
+    <div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+      <input id="t-name" placeholder="cloud name (e.g. oracle-cloud)">
+      <input id="t-url" placeholder="https://YOUR_VM_IP/health">
+      <input id="t-region" placeholder="region (e.g. ap-mumbai-1)">
+      <button class="btn primary" onclick="addTarget()">Add target</button>
+    </div>
+  </div>
+
+  <div class="section-head"><h2>API keys &amp; audit</h2></div>
+  <div class="grid cols-2">
+    <div class="card">
+      <h3>🗝️ Generate API key</h3>
+      <div class="sub">creates an org + hashed key in Supabase (demo mode)</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <input id="k-org" placeholder="org name (default)" style="max-width:220px">
+        <button class="btn" onclick="genKey()">Generate</button>
+      </div>
+      <pre class="code hidden" id="key-out" style="margin-top:12px"></pre>
+    </div>
+    <div class="card">
+      <h3>📜 Audit log (last 100)</h3>
+      <ul class="timeline" id="audit-list"><li class="muted">loading…</li></ul>
+    </div>
+  </div>
+
+  <div class="section-head"><h2>Reports</h2></div>
+  <div class="card">
+    <p class="muted">Generate an on-demand health report and store it in <span class="mono">health_reports</span> (visible on the Dashboard/API).</p>
+    <button class="btn primary" onclick="genReport()">Generate report now</button>
+    <pre class="code hidden" id="report-out" style="margin-top:12px"></pre>
+  </div>
+
+  <footer>
+    <span>Aegis · admin console</span>
+    <span>targets · keys · audit · reports</span>
+  </footer>
+</div>
+
+<script src="/assets/aegis.js"></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const TOKEN_KEY = 'aegis_admin_token';
+
+  function token() { return localStorage.getItem(TOKEN_KEY) || ''; }
+
+  function headers() {
+    return { 'Content-Type': 'application/json', 'x-admin-token': token() };
+  }
+
+  function show(id, text, err) {
+    const el = $(id);
+    el.classList.remove('hidden');
+    el.textContent = typeof text === 'string' ? text : JSON.stringify(text, null, 2);
+    if (err) el.style.color = 'var(--red)'; else el.style.color = '';
+  }
+
+  function saveToken() {
+    localStorage.setItem(TOKEN_KEY, $('admin-token').value.trim());
+    $('token-status').innerHTML = token()
+      ? 'Token saved in this browser. Admin actions are now available.'
+      : 'No token set — admin actions will be rejected by the server.';
+    Aegis.toast('Token saved.');
+    loadAll();
+  }
+
+  async function loadTargets() {
+    try {
+      const res = await fetch('/api/admin/targets', { headers: headers() });
+      if (res.status === 401) {
+        $('targets-body').innerHTML = '<tr><td class="muted">Set the admin token first.</td></tr>';
+        return;
+      }
+      const data = await res.json();
+      const rows = data.targets || [];
+      $('targets-body').innerHTML = rows.length ? rows.map(r =>
+        '<tr><td><strong>' + r.cloud_name + '</strong></td>' +
+        '<td class="mono small">' + r.url + '</td>' +
+        '<td class="muted">' + (r.region || '—') + '</td>' +
+        '<td>' + (r.enabled ? '<span class="pill up">on</span>' : '<span class="pill muted">off</span>') + '</td>' +
+        '<td><button class="btn small" style="padding:5px 10px" onclick="toggleTarget(' + r.id + ',' + (r.enabled ? 'false' : 'true') + ')">' + (r.enabled ? 'disable' : 'enable') + '</button></td></tr>'
+      ).join('') : '<tr><td class="muted">No targets configured.</td></tr>';
+    } catch (e) {
+      $('targets-body').innerHTML = '<tr><td class="muted">error: ' + e.message + '</td></tr>';
+    }
+  }
+
+  async function loadAudit() {
+    try {
+      const res = await fetch('/api/admin/audit', { headers: headers() });
+      if (res.status === 401) { $('audit-list').innerHTML = '<li class="muted">set admin token first</li>'; return; }
+      const data = await res.json();
+      const rows = data.events || [];
+      $('audit-list').innerHTML = rows.length ? rows.slice(0, 40).map(r =>
+        '<li class="info"><div><strong>' + r.action + '</strong> <span class="muted">· ' + (r.actor || 'anonymous').slice(0, 16) + '</span></div><div class="when">' + Aegis.fmtAgo(r.created_at) + '</div></li>'
+      ).join('') : '<li class="muted">No audit events yet.</li>';
+    } catch (e) {
+      $('audit-list').innerHTML = '<li class="muted">error: ' + e.message + '</li>';
+    }
+  }
+
+  function addTarget() {
+    fetch('/api/admin/targets', {
+      method: 'POST', headers: headers(),
+      body: JSON.stringify({ cloud_name: $('t-name').value.trim(), url: $('t-url').value.trim(), region: $('t-region').value.trim() }),
+    }).then(async r => {
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || r.status);
+      Aegis.toast('Target added.');
+      $('t-name').value = $('t-url').value = $('t-region').value = '';
+      loadTargets();
+    }).catch(e => Aegis.toast('Failed: ' + e.message, true));
+  }
+
+  function genKey() {
+    fetch('/api/admin/keys', {
+      method: 'POST', headers: headers(),
+      body: JSON.stringify({ org: $('k-org').value.trim() || 'default' }),
+    }).then(async r => {
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || r.status);
+      show('key-out', 'SAVE THIS KEY (shown once):\n\n' + data.key);
+    }).catch(e => Aegis.toast('Failed: ' + e.message, true));
+  }
+
+  function genReport() {
+    fetch('/api/admin/reports', { method: 'POST', headers: headers() })
+      .then(async r => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || r.status);
+        show('report-out', data);
+        Aegis.toast('Report generated.');
+      })
+      .catch(e => Aegis.toast('Failed: ' + e.message, true));
+  }
+
+  function loadAll() { loadTargets(); loadAudit(); }
+  $('admin-token').value = token();
+  $('token-status').innerHTML = token() ? 'Token loaded from this browser.' : $('token-status').innerHTML;
+  loadAll();
+})();
+</script>
+</body>
+</html>

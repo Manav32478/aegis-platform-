@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aegis Dashboard — Live Multi-Cloud Monitoring</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="/assets/aegis.css">
+</head>
+<body class="dark">
+
+<header class="topbar">
+  <a class="brand" href="/"><span class="logo">🛡️</span> Aegis</a>
+  <nav class="nav">
+    <a href="/">Overview</a>
+    <a href="/dashboard.html" class="active">Dashboard</a>
+    <a href="/status.html">Public Status</a>
+    <a href="/admin.html">Admin</a>
+  </nav>
+  <button class="theme-toggle" id="theme-btn" title="Toggle theme" onclick="Aegis.toggleTheme()">🌙</button>
+</header>
+
+<div class="wrap">
+
+  <!-- KPI strip -->
+  <div class="kpi-strip" id="kpi-strip"></div>
+
+  <div class="section-head" style="margin-top:22px">
+    <div>
+      <h1 style="font-size:26px;margin-bottom:2px">Live monitoring dashboard</h1>
+      <span class="muted small">real-time · vantage <span id="vantage" class="mono">…</span> · updated <span id="updated">…</span> · auto-refresh 10s</span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span class="badge-live" id="stream-state">streaming</span>
+      <a class="btn" href="/api/export.csv" download>⬇ CSV</a>
+      <a class="btn" href="/api/export.json" download>⬇ JSON</a>
+      <a class="btn ghost" href="/status.html">public status →</a>
+    </div>
+  </div>
+
+  <!-- Vector probe strip: the platform checking each cloud RIGHT NOW -->
+  <div class="grid cols-2">
+    <div class="card">
+      <h3>📡 Real-time probes <span class="muted small" style="font-weight:400">(platform → each cloud, every 10s)</span></h3>
+      <div id="probe-list"><p class="muted">probing…</p></div>
+    </div>
+    <div class="card">
+      <h3>🖥️ Live event feed</h3>
+      <div class="event-feed" id="event-feed"></div>
+    </div>
+  </div>
+
+  <!-- Per-cloud cards -->
+  <div class="section-head"><h2>Cloud health</h2></div>
+  <div class="grid cols-3" id="cloud-cards"></div>
+
+  <!-- Charts -->
+  <div class="section-head"><h2>Latency &amp; uptime</h2></div>
+  <div class="grid cols-2">
+    <div class="card">
+      <h3>Latency (ms) — per cloud</h3>
+      <div class="sub">rolling history (latest 200 checks)</div>
+      <div id="latency-wrap"><canvas id="latency-chart" width="560" height="260"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Uptime (%) — per cloud</h3>
+      <div class="sub">share of healthy checks · target 99.9%</div>
+      <canvas id="uptime-chart" width="560" height="260"></canvas>
+    </div>
+  </div>
+
+  <!-- Intelligence row -->
+  <div class="section-head"><h2>Intelligence</h2></div>
+  <div class="grid cols-3">
+    <div class="card">
+      <h3>🔮 Predictive risk</h3>
+      <div class="sub">rolling-statistics anomaly detector</div>
+      <div id="risk-list"><p class="muted">loading…</p></div>
+    </div>
+    <div class="card">
+      <h3>🚦 Routing decision</h3>
+      <div class="sub">who serves traffic next + why</div>
+      <div id="route-box"></div>
+    </div>
+    <div class="card">
+      <h3>📜 SLA compliance</h3>
+      <div class="sub">uptime vs 99.9% target</div>
+      <div id="sla-list"><p class="muted">loading…</p></div>
+    </div>
+  </div>
+
+  <!-- Cost + carbon -->
+  <div class="section-head"><h2>Cost &amp; carbon</h2></div>
+  <div class="grid cols-2">
+    <div class="card">
+      <h3>💸 Cost forecast (12 months)</h3>
+      <div class="sub">single paid cloud vs Aegis free tiers</div>
+      <canvas id="cost-chart" width="560" height="230"></canvas>
+      <p class="muted small" style="margin-top:10px">
+        Assumes 1,000,000 req/mo growing 10%/mo. Paid baseline <strong>$40/million</strong> (illustrative).
+        Cite: Cloud Run $0.40/million beyond free tier; Aegis runs inside free tiers.
+      </p>
+    </div>
+    <div class="card">
+      <h3>🌱 Carbon-aware routing</h3>
+      <div class="sub">grid intensity gCO₂e/kWh — greenest first</div>
+      <table id="carbon-table"><tbody><tr><td class="muted">loading…</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <!-- Incidents + alerts -->
+  <div class="section-head"><h2>Incidents &amp; alert log</h2></div>
+  <div class="grid cols-2">
+    <div class="card">
+      <h3>🚨 Incident timeline</h3>
+      <ul class="timeline" id="incident-list"><li class="muted">loading…</li></ul>
+    </div>
+    <div class="card">
+      <h3>🔔 Recent alerts</h3>
+      <ul class="timeline" id="alert-list"><li class="muted">loading…</li></ul>
+    </div>
+  </div>
+
+  <div class="section-head"><h2>Failover events</h2></div>
+  <div class="card">
+    <table>
+      <thead><tr><th>When</th><th>From</th><th>To</th><th>Reason</th></tr></thead>
+      <tbody id="failover-list"><tr><td class="muted">loading…</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="section-head"><h2>Embeddable status badges</h2></div>
+  <div class="card">
+    <p class="muted small" style="margin-bottom:12px">Paste these into your GitHub README so visitors see live cloud health:</p>
+    <div id="badge-list" class="grid cols-2"></div>
+  </div>
+
+  <footer>
+    <span>Aegis · Self-Healing Multi-Cloud Platform · Major Project (6 months)</span>
+    <span>Render + Vercel + Cloud Run · Cloudflare · Supabase · ₹0/month · real-time SSE</span>
+  </footer>
+</div>
+
+<script src="/assets/aegis.js"></script>
+<script>
+(function () {
+  const COLORS = ['#4f8cff', '#2fd57a', '#ffb454', '#c7468c', '#38c8dd', '#9b7bff'];
+  let colorOf = {};
+  const feed = [];
+
+  function color(name) {
+    if (!colorOf[name]) colorOf[name] = COLORS[Object.keys(colorOf).length % COLORS.length];
+    return colorOf[name];
+  }
+
+  function pushFeed(line, cls) {
+    feed.unshift({ line, cls, t: new Date() });
+    if (feed.length > 60) feed.pop();
+    renderFeed();
+  }
+
+  function renderFeed() {
+    const el = document.getElementById('event-feed');
+    if (!el) { return; }
+    el.innerHTML = feed.map(function (f) {
+      const ts = f.t.toISOString().slice(11, 19);
+      return '<div class="line ' + f.cls + '"><span class="ts">' + ts + '</span>' + f.line + '</div>';
+    }).join('');
+  }
+
+  function fmtPct(p) { return Aegis.fmtPct(p); }
+
+  function renderKpis(d) {
+    const names = Object.keys(d.analytics || {});
+    const healthy = (d.probes || []).filter(function (p) { return p.healthy; }).length;
+    const total = (d.probes || []).filter(function (p) { return p.enabled !== false; }).length;
+    const open = (d.openIncidents || []).length;
+    const risk = names.filter(function (n) { return d.riskMap[n]; }).length;
+    const kpis = [
+      { k: 'Live probes', v: healthy + ' / ' + total, s: 'clouds OK' },
+      { k: 'Clouds tracked', v: names.length, s: 'in analytics' },
+      { k: 'Checks recorded', v: d.totalChecks, s: 'in Supabase' },
+      { k: 'Open incidents', v: open, s: open ? '⚠ attention' : 'none' },
+      { k: 'At-risk flags', v: risk, s: risk ? '⚠ anomaly' : 'stable' },
+      { k: 'Est. savings', v: d.cost.savedUsd + '', s: '$/month' },
+    ];
+    document.getElementById('kpi-strip').innerHTML = kpis.map(function (x) {
+      return '<div class="kpi"><div class="k">' + x.k + '</div><div class="v">' + x.v + ' <small>' + x.s + '</small></div></div>';
+    }).join('');
+  }
+
+  function renderProbes(d) {
+    const el = document.getElementById('probe-list');
+    const probes = d.probes || [];
+    if (!probes.length) { el.innerHTML = '<p class="muted">no targets configured</p>'; return; }
+    el.innerHTML = probes.map(function (p) {
+      let dot = 'off', label = 'disabled', colorCls = 'pill muted';
+      if (p.enabled === false) { dot = 'off'; label = 'not deployed'; }
+      else if (p.healthy) { dot = 'up'; label = p.latency + ' ms'; colorCls = 'pill up'; }
+      else { dot = 'down'; label = 'down'; colorCls = 'pill down'; }
+      const barPct = p.healthy ? Math.max(6, Math.min(100, Math.round((p.latency || 0) / 10))) : 100;
+      const barColor = p.enabled === false ? '#3a4a68' : (p.healthy ? (p.latency < 400 ? 'var(--green)' : 'var(--amber)') : 'var(--red)');
+      return '<div class="probe-row">' +
+        '<span class="pulse ' + dot + '"></span>' +
+        '<div class="grow"><div style="display:flex;justify-content:space-between;gap:8px">' +
+          '<strong>' + p.name + '</strong><span class="' + colorCls + '">' + label + '</span></div>' +
+          '<div class="url">' + p.url + '/health</div>' +
+          '<div class="bar" style="margin-top:6px"><i style="width:' + barPct + '%;background:' + barColor + '"></i></div>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  function renderCloudCards(d) {
+    const el = document.getElementById('cloud-cards');
+    const names = Object.keys(d.analytics || {});
+    if (!names.length) {
+      el.innerHTML = '<div class="card"><h3>No data yet</h3><p class="muted">The monitor has not written any checks. Run <kbd>node orchestration/monitor.js</kbd> once.</p></div>';
+      return;
+    }
+    el.innerHTML = names.map(function (name) {
+      const a = d.analytics[name];
+      const c = color(name);
+      const atRisk = d.riskMap[name];
+      const live = a.last && a.last.healthy;
+      const lats = a.percentiles;
+      const pct = a.score == null ? 0 : a.score;
+      const upPct = a.uptimePct == null ? 0 : a.uptimePct;
+      const trend = a.trend || {};
+      const s = d.series && d.series[name];
+      const sla = a.sla || {};
+      return '<div class="card" style="border-top:3px solid ' + c + '">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
+          '<div><h3><span class="dot ' + (live ? 'up' : 'down') + '"></span>' + name + '</h3>' +
+          '<div class="muted small">' + (a.last ? 'last check ' + Aegis.fmtAgo(a.last.checked_at) : 'never checked') +
+          (a.last && a.last.http_status ? ' · HTTP ' + a.last.http_status : '') + '</div></div>' +
+          '<div class="score-ring" style="--pct:' + pct + ';--c:' + Aegis.gradeColor(a.grade) + '"><span class="num">' + pct + '</span></div>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;margin:12px 0 6px;flex-wrap:wrap">' +
+          '<span class="pill ' + (live ? 'up' : 'down') + '">' + (live ? 'UP' : 'DOWN') + '</span>' +
+          '<span class="pill info">' + (a.grade || '—') + '</span>' +
+          (atRisk ? '<span class="pill warn">⚠ at risk</span>' : '<span class="pill muted">stable</span>') +
+        '</div>' +
+        (s ? '<canvas class="spark lg" data-spark="' + name + '"></canvas>' : '') +
+        '<table>' +
+          '<tr><td>Uptime</td><td style="text-align:right"><strong>' + upPct.toFixed(1) + '%</strong></td></tr>' +
+          '<tr><td>SLA 99.9%</td><td style="text-align:right"><span class="pill ' + slaClass(sla) + '">' + (sla.status || '—') + '</span></td></tr>' +
+          '<tr><td>Avg latency</td><td style="text-align:right"><strong>' + (a.avgLatencyMs != null ? a.avgLatencyMs + ' ms' : '—') + '</strong>' + trendArrow(trend) + '</td></tr>' +
+          '<tr><td>p50 / p95 / p99</td><td style="text-align:right">' + (lats.p50 != null ? lats.p50 + ' / ' + lats.p95 + ' / ' + lats.p99 + ' ms' : '—') + '</td></tr>' +
+          '<tr><td>Error rate</td><td style="text-align:right">' + (a.errorRate != null ? (a.errorRate * 100).toFixed(1) + '%' : '—') + '</td></tr>' +
+          '<tr><td>Checks</td><td style="text-align:right">' + a.checks + '</td></tr>' +
+        '</table>' +
+      '</div>';
+    }).join('');
+    drawSparklines(d);
+  }
+
+  function slaClass(sla) {
+    if (!sla || !sla.status) { return 'muted'; }
+    return sla.status === 'Met' ? 'up' : sla.status === 'Near' ? 'warn' : 'down';
+  }
+
+  function trendArrow(trend) {
+    if (!trend || trend.deltaMs == null) { return ''; }
+    const s = (trend.deltaMs > 0 ? '+' : '') + trend.deltaMs + 'ms';
+    const cls = trend.dir === 'up' ? 'up-bad' : (trend.dir === 'down' ? 'down-good' : 'flat');
+    const arrow = trend.dir === 'up' ? ' ▲' : (trend.dir === 'down' ? ' ▼' : ' ●');
+    return ' <span class="small ' + cls + '">' + s + arrow + '</span>';
+  }
+
+  function drawSparklines(d) {
+    document.querySelectorAll('canvas[data-spark]').forEach(function (cv) {
+      const name = cv.getAttribute('data-spark');
+      const s = d.series && d.series[name];
+      const ctx = cv.getContext('2d');
+      const W = cv.clientWidth || cv.width || 300, H = cv.clientHeight || cv.height || 80;
+      cv.width = W; cv.height = H;
+      ctx.clearRect(0, 0, W, H);
+      if (!s || !s.y || s.y.length < 2) {
+        ctx.fillStyle = 'rgba(143,160,189,0.6)'; ctx.font = '11px system-ui';
+        ctx.fillText('collecting…', 8, H / 2 + 4); return;
+      }
+      const vals = s.y.map(function (v) { return v == null ? null : v; });
+      const nums = vals.filter(function (v) { return v != null; });
+      if (!nums.length) { return; }
+      const max = Math.max.apply(null, nums), min = Math.min.apply(null, nums);
+      const range = (max - min) || 1;
+      const n = vals.length;
+      const pad = 6;
+      ctx.strokeStyle = color(name); ctx.lineWidth = 2; ctx.beginPath();
+      let started = false;
+      vals.forEach(function (v, i) {
+        if (v == null) { started = false; return; }
+        const x = pad + (i / (n - 1)) * (W - pad * 2);
+        const y = H - pad - ((v - min) / range) * (H - pad * 2);
+        if (!started) { ctx.moveTo(x, y); started = true; } else { ctx.lineTo(x, y); }
+      });
+      ctx.stroke();
+      // last point
+      const lastV = vals[vals.length - 1];
+      if (lastV != null) {
+        const lx = pad + ((n - 1) / (n - 1)) * (W - pad * 2);
+        const ly = H - pad - ((lastV - min) / range) * (H - pad * 2);
+        ctx.fillStyle = color(name);
+        ctx.beginPath(); ctx.arc(lx, ly, 3, 0, Math.PI * 2); ctx.fill();
+      }
+    });
+  }
+
+  function drawCharts(d) {
+    drawLatencyChart(d);
+    drawUptimeChart(d);
+    drawCostChart(d);
+  }
+
+  function drawLatencyChart(d) {
+    const cv = document.getElementById('latency-chart');
+    if (!cv) { return; }
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H);
+    const names = Object.keys(d.analytics || {});
+    if (!names.length) { ctx.fillStyle = '#8fa0bd'; ctx.fillText('no data yet', 40, H / 2); return; }
+    barChart(ctx, W, H, names.map(function (n) { return { label: n, value: d.analytics[n].avgLatencyMs ?? 0, color: color(n) }; }), 'ms');
+  }
+
+  function drawUptimeChart(d) {
+    const cv = document.getElementById('uptime-chart');
+    if (!cv) { return; }
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H);
+    const names = Object.keys(d.analytics || {});
+    if (!names.length) { ctx.fillStyle = '#8fa0bd'; ctx.fillText('no data yet', 40, H / 2); return; }
+    // draw target line at 99.9
+    const pad = 40;
+    ctx.strokeStyle = 'rgba(255,180,84,0.5)';
+    ctx.setLineDash([4, 4]);
+    const tY = pad + (1 - 0.999) * (H - pad * 2);
+    ctx.beginPath(); ctx.moveTo(pad, tY); ctx.lineTo(W - 8, tY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#ffb454'; ctx.font = '10px system-ui'; ctx.fillText('99.9% target', W - 78, tY - 4);
+    barChart(ctx, W, H, names.map(function (n) { return { label: n, value: d.analytics[n].uptimePct ?? 0, color: color(n) }; }), '%', 0.9);
+  }
+
+  function barChart(ctx, W, H, items, unit, floorPct) {
+    const max = Math.max(1, Math.max.apply(null, items.map(function (i) { return i.value; })));
+    const pad = 40, gap = 14;
+    const bw = (W - pad * 2 - gap * (items.length - 1)) / items.length;
+    items.forEach(function (it, i) {
+      const h = Math.max(3, (it.value / max) * (H - pad * 2));
+      const x = pad + i * (bw + gap);
+      const y = H - pad - h;
+      const label = String(it.value) + unit;
+      ctx.fillStyle = it.color;
+      ctx.beginPath(); ctx.roundRect(x, y, bw, h, 4); ctx.fill();
+      ctx.fillStyle = '#e7edf7'; ctx.font = 'bold 12px system-ui';
+      ctx.fillText(label, x + bw / 2 - ctx.measureText(label).width / 2, y - 6);
+      ctx.fillStyle = '#8fa0bd'; ctx.font = '11px system-ui';
+      ctx.fillText(it.label, x + bw / 2 - ctx.measureText(it.label).width / 2, H - pad + 16);
+    });
+  }
+
+  function drawCostChart(d) {
+    const cv = document.getElementById('cost-chart');
+    if (!cv) { return; }
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H);
+    const rows = d.forecast && d.forecast.rows ? d.forecast.rows : [];
+    if (!rows.length) { ctx.fillStyle = '#8fa0bd'; ctx.font = '12px system-ui'; ctx.fillText('no forecast', 20, H / 2); return; }
+    const max = Math.max(1, Math.max.apply(null, rows.map(function (r) { return r.singleCloudUsd; })));
+    const pad = 40, n = rows.length;
+    ctx.strokeStyle = '#22304a'; ctx.fillStyle = '#8fa0bd'; ctx.font = '11px system-ui';
+    for (var yv = 0; yv <= max; yv += Math.ceil(max / 4)) {
+      const y = H - pad - (yv / max) * (H - pad * 2);
+      ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - 8, y); ctx.stroke();
+      ctx.fillText('$' + yv, 4, y + 4);
+    }
+    const xf = function (i) { return pad + (i / (n - 1)) * (W - pad - 12); };
+    ['singleCloudUsd', 'aegisUsd'].forEach(function (key, ki) {
+      ctx.strokeStyle = ki === 0 ? '#ff5d6c' : '#2fd57a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      rows.forEach(function (r, i) { const X = xf(i), Y = H - pad - (r[key] / max) * (H - pad * 2); if (i) { ctx.lineTo(X, Y); } else { ctx.moveTo(X, Y); } });
+      ctx.stroke();
+    });
+    ctx.fillStyle = '#ff5d6c'; ctx.fillText('single paid cloud', W - 180, 18);
+    ctx.fillStyle = '#2fd57a'; ctx.fillText('Aegis (₹0)', W - 180, 34);
+  }
+
+  function renderRisk(d) {
+    const el = document.getElementById('risk-list');
+    const names = Object.keys(d.analytics || {});
+    const risky = names.filter(function (n) { return d.riskMap[n]; });
+    el.innerHTML = risky.length
+      ? risky.map(function (n) { return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #22304a"><span><span class="pill warn">⚠ ' + n + '</span></span><span class="muted small">flagged by detector</span></div>'; }).join('')
+      : '<p class="muted" style="color:var(--green)">All clouds stable — no anomalies detected.</p>';
+  }
+
+  function renderRoute(d) {
+    const el = document.getElementById('route-box');
+    const r = d.route || {};
+    if (!r.route) {
+      el.innerHTML = '<p class="muted">No healthy route available.</p>';
+      return;
+    }
+    el.innerHTML =
+      '<div class="stat" style="margin-bottom:8px"><span class="value" style="font-size:24px">→ ' + Aegis.cap(r.route) + '</span></div>' +
+      '<p class="muted">' + r.reason + '</p>' +
+      (r.fallback ? '<p class="small muted">Failover standby: <strong>' + Aegis.cap(r.fallback) + '</strong></p>' : '');
+  }
+
+  function renderSla(d) {
+    const el = document.getElementById('sla-list');
+    const names = Object.keys(d.analytics || {});
+    if (!names.length) { el.innerHTML = '<p class="muted">no data</p>'; return; }
+    el.innerHTML = names.map(function (n) {
+      const a = d.analytics[n];
+      const sla = a.sla || {};
+      return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #22304a">' +
+        '<span>' + n + '</span>' +
+        '<span><strong style="color:' + Aegis.slaColor(sla.status) + '">' + (a.uptimePct != null ? a.uptimePct.toFixed(2) + '%' : '—') + '</strong> ' +
+        '<span class="small muted">(' + (sla.delta != null ? (sla.delta >= 0 ? '+' : '') + sla.delta.toFixed(2) : '') + ' vs target)</span></span>' +
+      '</div>';
+    }).join('');
+  }
+
+  function renderCarbon(d) {
+    const rows = d.carbon || [];
+    const el = document.getElementById('carbon-table');
+    if (!rows.length) { el.innerHTML = '<tr><td class="muted">no carbon data</td></tr>'; return; }
+    el.innerHTML = rows.map(function (c, i) {
+      return '<tr><td>' + (i === 0 ? '🌿 ' : '') + c.region + '</td>' +
+        '<td style="text-align:right"><strong>' + c.carbonIntensity + '</strong></td>' +
+        '<td class="muted small" style="text-align:right">' + (c.source === 'live' ? 'live' : 'fallback') + (i === 0 ? ' · greenest' : '') + '</td></tr>';
+    }).join('');
+  }
+
+  function renderFeed(listId, items, classFn, textFn) {
+    const el = document.getElementById(listId);
+    if (!items || !items.length) { el.innerHTML = '<li class="muted" style="color:var(--green)">None — all clear.</li>'; return; }
+    el.innerHTML = items.slice(0, 12).map(function (it) {
+      return '<li class="' + classFn(it) + '"><div>' + textFn(it) + '</div><div class="when">' +
+        Aegis.fmtAgo(it.created_at || it.started_at || it.flagged_at) + '</div></li>';
+    }).join('');
+  }
+
+  function renderFailover(d) {
+    const el = document.getElementById('failover-list');
+    const rows = d.failover || [];
+    if (!rows.length) {
+      el.innerHTML = '<tr><td class="muted">None yet — a failover is recorded when self-heal triggers.</td></tr>';
+      return;
+    }
+    el.innerHTML = rows.slice(0, 12).map(function (r) {
+      return '<tr><td class="muted small">' + Aegis.fmtAgo(r.created_at) + '</td>' +
+        '<td><span class="pill down">' + r.from_cloud + '</span></td>' +
+        '<td><span class="pill up">' + r.to_cloud + '</span></td>' +
+        '<td class="muted">' + r.reason + '</td></tr>';
+    }).join('');
+  }
+
+  function renderBadges(d) {
+    const el = document.getElementById('badge-list');
+    const names = Object.keys(d.analytics || {});
+    if (!names.length) { el.innerHTML = '<p class="muted">no clouds</p>'; return; }
+    el.innerHTML = names.map(function (n) {
+      const url = '/badge/' + encodeURIComponent(n) + '.svg';
+      return '<div><div style="margin-bottom:6px"><img src="' + url + '" alt="' + n + '" style="height:20px;display:block"></div>' +
+        '<code class="mono small" style="word-break:break-all">[![aegis](' + url + ')]</code></div>';
+    }).join('');
+  }
+
+  function render(d) {
+    document.getElementById('vantage').textContent = d.vantage;
+    document.getElementById('updated').textContent = Aegis.fmtAgo(d.generatedAt);
+    document.getElementById('stream-state').textContent = 'streaming';
+    renderKpis(d);
+    renderProbes(d);
+    renderCloudCards(d);
+    drawCharts(d);
+    renderRisk(d);
+    renderRoute(d);
+    renderSla(d);
+    renderCarbon(d);
+    renderFeed('incident-list', d.incidents,
+      function (i) { return i.ended_at ? 'info' : 'critical'; },
+      function (i) { return (i.ended_at ? 'Recovered: ' : 'DOWN: ') + i.cloud_name + (i.duration_seconds ? ' · ' + Aegis.fmtDuration(i.duration_seconds) : ''); });
+    renderFeed('alert-list', d.alerts,
+      function (i) { return i.severity === 'critical' ? 'critical' : (i.severity === 'warning' ? 'warning' : 'info'); },
+      function (i) { return '<strong>' + Aegis.cap(i.kind) + '</strong> — ' + i.message; });
+    renderFailover(d);
+    renderBadges(d);
+  }
+
+  function logEvents(d) {
+    // push a few representative events into the terminal-style feed
+    const probes = d.probes || [];
+    probes.forEach(function (p) {
+      if (p.enabled === false) { return; }
+      pushFeed(p.healthy ? ('probe ' + p.name + ' OK · ' + p.latency + ' ms') : ('probe ' + p.name + ' DOWN'), p.healthy ? 'green' : 'red');
+    });
+    if (d.route && d.route.route) { pushFeed('route → ' + d.route.route + ' (' + d.route.reason + ')', 'info'); }
+    (d.openIncidents || []).forEach(function (i) { pushFeed('incident open: ' + i.cloud_name, 'red'); });
+  }
+
+  Aegis.on('aegis:data', function (d) { render(d); logEvents(d); });
+  Aegis.startLive();
+
+  // initial paint even before the stream delivers
+  Aegis.load().then(function () {}).catch(function (e) {
+    document.getElementById('stream-state').textContent = 'offline';
+    Aegis.toast('Could not load live data: ' + e.message, true);
+  });
+  setInterval(function () {
+    // refresh theme icon
+    const dark = document.documentElement.getAttribute('data-theme') !== 'light';
+    document.getElementById('theme-btn').textContent = dark ? '☀️' : '🌙';
+  }, 1000);
+})();
+</script>
+</body>
+</html>

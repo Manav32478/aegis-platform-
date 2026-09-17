@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aegis — Self-Healing Multi-Cloud Platform</title>
+<style>
+  :root{
+    --bg:#070b14; --bg2:#0b1220; --panel:rgba(19,26,43,.72); --panel2:#131a2b;
+    --border:#243047; --border2:#2c3d66; --text:#e6ebf5; --muted:#8b96ad; --dim:#5a6680;
+    --green:#3ddc84; --blue:#4285f4; --amber:#ffb454; --red:#ff5d5d; --violet:#a06bff; --cyan:#4fd6e8;
+    --grad:linear-gradient(120deg,#3ddc84,#4fd6e8 55%,#4285f4);
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--text); line-height:1.55; overflow-x:hidden;
+  }
+  /* decorative background glows */
+  .glow{position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(900px 500px at 15% -10%, rgba(66,133,244,.16), transparent 60%),
+      radial-gradient(800px 500px at 90% 0%, rgba(61,220,132,.12), transparent 60%),
+      radial-gradient(700px 500px at 50% 110%, rgba(160,107,255,.10), transparent 60%),
+      var(--bg);
+  }
+  .grid-lines{position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.35;
+    background-image:linear-gradient(rgba(140,160,200,.05) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(140,160,200,.05) 1px,transparent 1px);
+    background-size:44px 44px; mask-image:radial-gradient(ellipse 90% 70% at 50% 0%,#000 40%,transparent 80%);
+  }
+  .wrap{max-width:1160px; margin:0 auto; padding:0 26px;}
+
+  /* ---------- top bar ---------- */
+  .topbar{position:sticky; top:0; z-index:20; backdrop-filter:blur(14px);
+    background:rgba(7,11,20,.7); border-bottom:1px solid var(--border);}
+  .topbar .wrap{display:flex; align-items:center; gap:14px; height:60px;}
+  .logo{display:flex; align-items:center; gap:10px; font-weight:700; font-size:16px; letter-spacing:.3px;}
+  .logo svg{filter:drop-shadow(0 0 10px rgba(61,220,132,.5));}
+  .spacer{flex:1;}
+  .badge{font-size:12px; padding:4px 11px; border-radius:999px; border:1px solid var(--border2);
+    background:rgba(28,42,74,.5); color:#9db4ff; white-space:nowrap;}
+  .badge.live{color:var(--green); border-color:rgba(61,220,132,.4); background:rgba(61,220,132,.1); display:flex; align-items:center; gap:7px;}
+  .badge.demo{color:var(--amber); border-color:rgba(255,180,84,.4); background:rgba(255,180,84,.1); display:none; align-items:center; gap:7px;}
+  .pulse{width:8px; height:8px; border-radius:50%; background:currentColor; box-shadow:0 0 0 0 rgba(61,220,132,.6); animation:pulse 2s infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(61,220,132,.5);}70%{box-shadow:0 0 0 8px rgba(61,220,132,0);}100%{box-shadow:0 0 0 0 rgba(61,220,132,0);}}
+
+  /* ---------- hero ---------- */
+  .hero{padding:64px 0 40px; text-align:left;}
+  .kicker{font-size:13px; letter-spacing:2.5px; text-transform:uppercase; color:var(--cyan); font-weight:600;}
+  .hero h1{font-size:56px; line-height:1.05; margin:14px 0 12px; font-weight:800; letter-spacing:-1px;}
+  .hero h1 .grad{background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent;}
+  .hero .sub{font-size:18px; color:var(--muted); max-width:720px;}
+  .metrics{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:16px; margin-top:38px;}
+  .metric{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:20px; backdrop-filter:blur(8px);}
+  .metric .k{font-size:12px; color:var(--muted); letter-spacing:.4px;}
+  .metric .v{font-size:34px; font-weight:800; margin-top:6px; letter-spacing:-.5px;}
+  .metric .v small{font-size:15px; font-weight:600; color:var(--muted);}
+  .metric .d{font-size:12px; color:var(--dim); margin-top:4px;}
+  .accent-g{color:var(--green);} .accent-b{color:var(--blue);} .accent-a{color:var(--amber);} .accent-v{color:var(--violet);}
+
+  /* ---------- sections ---------- */
+  section{padding:34px 0;}
+  .sec-head{display:flex; align-items:baseline; gap:12px; margin-bottom:20px;}
+  .sec-head h2{font-size:22px; font-weight:700; letter-spacing:-.3px;}
+  .sec-head .tag{font-size:12px; color:var(--dim);}
+  .rule{height:1px; background:linear-gradient(90deg,var(--border),transparent); margin-bottom:22px;}
+
+  /* ---------- status cards ---------- */
+  .status-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px;}
+  .node{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:20px; backdrop-filter:blur(8px); position:relative; overflow:hidden;}
+  .node::before{content:""; position:absolute; inset:0 0 auto 0; height:2px; background:var(--accent,#3ddc84); opacity:.6;}
+  .node .row{display:flex; align-items:center; gap:10px;}
+  .node .ic{width:38px; height:38px; border-radius:10px; display:grid; place-items:center; background:rgba(255,255,255,.04); border:1px solid var(--border);}
+  .node .nm{font-weight:700; font-size:15px;}
+  .node .role{font-size:11px; color:var(--muted);}
+  .node .state{margin-left:auto;}
+  .pill{font-size:11px; font-weight:600; padding:3px 9px; border-radius:999px; letter-spacing:.4px;}
+  .pill.up{background:rgba(61,220,132,.13); color:var(--green);}
+  .pill.down{background:rgba(255,93,93,.14); color:var(--red);}
+  .pill.warn{background:rgba(255,180,84,.14); color:var(--amber);}
+  .pill.na{background:rgba(139,150,173,.14); color:var(--muted);}
+  .node .stats{display:flex; gap:22px; margin-top:16px; flex-wrap:wrap;}
+  .node .st .k{font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.5px;}
+  .node .st .v{font-size:19px; font-weight:700; margin-top:2px;}
+  .node .url{font-size:11px; color:var(--dim); margin-top:14px; word-break:break-all; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+
+  /* ---------- architecture ---------- */
+  .arch-card{background:var(--panel); border:1px solid var(--border); border-radius:18px; padding:26px; backdrop-filter:blur(8px); overflow-x:auto;}
+  .arch-card svg{width:100%; height:auto; min-width:720px; display:block;}
+  .arch-legend{display:flex; gap:18px; flex-wrap:wrap; margin-top:16px; font-size:12px; color:var(--muted);}
+  .arch-legend .li{display:flex; align-items:center; gap:7px;}
+  .arch-legend .sw{width:22px; height:4px; border-radius:2px;}
+
+  /* ---------- intelligence ---------- */
+  .intel-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:16px;}
+  .intel{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:20px; backdrop-filter:blur(8px);}
+  .intel .ic{width:40px; height:40px; border-radius:11px; display:grid; place-items:center; margin-bottom:14px; border:1px solid var(--border);}
+  .intel h3{font-size:15px; font-weight:700; margin-bottom:6px;}
+  .intel p{font-size:13px; color:var(--muted);}
+  .intel .big{font-size:24px; font-weight:800; margin:10px 0 2px;}
+  .risk-line{display:flex; align-items:center; gap:8px; font-size:13px; margin-top:6px;}
+
+  /* ---------- roadmap ---------- */
+  .road{display:grid; gap:12px;}
+  .mile{display:grid; grid-template-columns:44px 1fr; gap:16px;}
+  .mile .mk{width:30px; height:30px; border-radius:50%; display:grid; place-items:center; font-size:14px; font-weight:800; border:1px solid var(--border2); background:var(--panel2); margin:0 auto; position:relative;}
+  .mile .mk.done{background:rgba(61,220,132,.14); color:var(--green); border-color:rgba(61,220,132,.4);}
+  .mile .mk.next{background:rgba(255,180,84,.12); color:var(--amber); border-color:rgba(255,180,84,.35);}
+  .mile .line{position:absolute; top:30px; left:50%; width:1px; height:calc(100% + 12px); background:var(--border);}
+  .mile:last-child .line{display:none;}
+  .mile .body{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px 18px; backdrop-filter:blur(8px);}
+  .mile .body .mh{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .mile .body h3{font-size:15px;}
+  .mile .body .when{font-size:11px; color:var(--dim);}
+  .mile .body p{font-size:13px; color:var(--muted); margin-top:6px;}
+
+  /* ---------- stack ---------- */
+  .chips{display:flex; flex-wrap:wrap; gap:10px;}
+  .chip{font-size:13px; padding:8px 14px; border-radius:999px; background:var(--panel); border:1px solid var(--border); color:var(--text);}
+  .chip b{color:var(--cyan); font-weight:600;}
+
+  footer{border-top:1px solid var(--border); padding:30px 0 60px; margin-top:20px;}
+  footer .links{display:flex; flex-wrap:wrap; gap:10px 22px; font-size:13px; color:var(--muted); margin-top:10px;}
+  footer a{color:var(--cyan); text-decoration:none;}
+  footer a:hover{text-decoration:underline;}
+
+  @media (max-width:640px){
+    .hero h1{font-size:38px;}
+    .topbar .badge.git{display:none;}
+  }
+</style>
+</head>
+<body>
+<div class="glow"></div>
+<div class="grid-lines"></div>
+
+<!-- ===================== TOP BAR ===================== -->
+<header class="topbar">
+  <div class="wrap">
+    <div class="logo">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+        <path d="M12 2 4 5v6c0 5 3.4 8.6 8 11 4.6-2.4 8-6 8-11V5l-8-3Z" stroke="#3ddc84" stroke-width="1.7" stroke-linejoin="round"/>
+        <path d="M8.6 12.2l2.3 2.3 4.5-4.6" stroke="#4fd6e8" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Aegis
+    </div>
+    <span class="spacer"></span>
+    <span class="badge live" id="modeLive"><span class="pulse"></span>LIVE</span>
+    <span class="badge demo" id="modeDemo">◐ offline preview — sample data</span>
+    <span class="badge git"><svg width="12" height="12" viewBox="0 0 16 16" style="vertical-align:-1px"><path fill="#9db4ff" d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.3.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.5.8 1.2.8 2.1 0 3.1-1.9 3.8-3.6 4 .3.2.5.7.5 1.4v2.1c0 .2.1.5.5.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8Z"/></svg>&nbsp;github.com/Manav32478/aegis-platform-</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ===================== HERO ===================== -->
+  <section class="hero">
+    <div class="kicker">Final Year Major Project · Multi-Cloud Engineering</div>
+    <h1>One app. Three clouds.<br><span class="grad">Zero downtime. $0 cost.</span></h1>
+    <p class="sub">Aegis runs a single application across multiple cloud free tiers, monitors every cloud every 5 minutes, and fails over automatically the moment one goes down — with cost, carbon, security and machine-learning intelligence on top.</p>
+    <div class="metrics">
+      <div class="metric"><div class="k">Live cloud regions</div><div class="v accent-g" id="mClouds">2</div><div class="d">Render · Vercel (free tiers)</div></div>
+      <div class="metric"><div class="k">Logical uptime</div><div class="v accent-b" id="mUptime">—</div><div class="d">across all clouds combined</div></div>
+      <div class="metric"><div class="k">Monthly cost</div><div class="v accent-g">$0<small>/mo</small></div><div class="d">vs ~$40/mo on one paid cloud</div></div>
+      <div class="metric"><div class="k">Failover speed</div><div class="v accent-v">&lt;1<small>s</small></div><div class="d">edge router, not DNS</div></div>
+    </div>
+  </section>
+
+  <!-- ===================== LIVE STATUS ===================== -->
+  <section id="status">
+    <div class="sec-head"><h2>Live system status</h2><span class="tag" id="statusTag">reading from Supabase…</span></div>
+    <div class="rule"></div>
+    <div class="status-grid" id="statusGrid">
+      <!-- populated by JS -->
+    </div>
+  </section>
+
+  <!-- ===================== ARCHITECTURE ===================== -->
+  <section id="architecture">
+    <div class="sec-head"><h2>Architecture</h2><span class="tag">5 layers · edge → compute → data → intelligence → access</span></div>
+    <div class="rule"></div>
+    <div class="arch-card">
+      <svg viewBox="0 0 1040 330" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="#5a6680"/>
+          </marker>
+          <marker id="arrg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="#3ddc84"/>
+          </marker>
+        </defs>
+        <g font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif">
+          <!-- Layer 1: clients -->
+          <rect x="14" y="16" width="150" height="60" rx="12" fill="#131a2b" stroke="#2c3d66"/>
+          <text x="89" y="42" text-anchor="middle" fill="#e6ebf5" font-size="14" font-weight="700">Clients / Users</text>
+          <text x="89" y="60" text-anchor="middle" fill="#8b96ad" font-size="10.5">browser · curl · apps</text>
+          <text x="89" y="10" text-anchor="middle" fill="#5a6680" font-size="10">LAYER 1</text>
+
+          <!-- Layer 2: router -->
+          <rect x="204" y="16" width="196" height="60" rx="12" fill="#0e1a2a" stroke="#3ddc84" stroke-width="1.4"/>
+          <text x="302" y="40" text-anchor="middle" fill="#e6ebf5" font-size="13.5" font-weight="700">Cloudflare Worker</text>
+          <text x="302" y="57" text-anchor="middle" fill="#8b96ad" font-size="10.5">failover router + cron monitor</text>
+          <text x="302" y="10" text-anchor="middle" fill="#3ddc84" font-size="10">LAYER 2 · EDGE</text>
+
+          <!-- Layer 3: clouds -->
+          <rect x="440" y="0" width="330" height="94" rx="14" fill="none" stroke="#243047" stroke-dasharray="4 4"/>
+          <text x="605" y="-6" text-anchor="middle" fill="#5a6680" font-size="10">LAYER 3 · COMPUTE (free tiers)</text>
+          <rect x="452" y="10" width="146" height="34" rx="9" fill="#131a2b" stroke="#3ddc84"/>
+          <text x="525" y="31" text-anchor="middle" fill="#e6ebf5" font-size="12" font-weight="600">Render</text>
+          <rect x="452" y="50" width="146" height="34" rx="9" fill="#131a2b" stroke="#4285f4"/>
+          <text x="525" y="71" text-anchor="middle" fill="#e6ebf5" font-size="12" font-weight="600">Vercel</text>
+          <rect x="612" y="10" width="146" height="34" rx="9" fill="#131a2b" stroke="#ffb454" stroke-dasharray="4 3"/>
+          <text x="685" y="31" text-anchor="middle" fill="#8b96ad" font-size="12" font-weight="600">GCP Run · next</text>
+          <rect x="612" y="50" width="146" height="34" rx="9" fill="#131a2b" stroke="#ff5d5d" stroke-dasharray="4 3"/>
+          <text x="685" y="71" text-anchor="middle" fill="#8b96ad" font-size="12" font-weight="600">Oracle · next</text>
+
+          <!-- Layer 4: data -->
+          <rect x="810" y="16" width="180" height="60" rx="12" fill="#131a2b" stroke="#ffb454"/>
+          <text x="900" y="40" text-anchor="middle" fill="#e6ebf5" font-size="13.5" font-weight="700">Supabase</text>
+          <text x="900" y="57" text-anchor="middle" fill="#8b96ad" font-size="10.5">health history · auth · ML data</text>
+          <text x="900" y="10" text-anchor="middle" fill="#ffb454" font-size="10">LAYER 4 · DATA</text>
+
+          <!-- Layer 5: intelligence + access -->
+          <rect x="204" y="238" width="360" height="76" rx="12" fill="#131a2b" stroke="#4285f4"/>
+          <text x="384" y="268" text-anchor="middle" fill="#e6ebf5" font-size="13.5" font-weight="700">Intelligence layer</text>
+          <text x="384" y="286" text-anchor="middle" fill="#8b96ad" font-size="10.5">cost · carbon · OPA policy · Trivy/Checkov · Isolation Forest (ML)</text>
+          <text x="384" y="300" text-anchor="middle" fill="#4285f4" font-size="10">LAYER 5 · INTELLIGENCE</text>
+
+          <rect x="640" y="238" width="350" height="76" rx="12" fill="#131a2b" stroke="#3ddc84"/>
+          <text x="815" y="268" text-anchor="middle" fill="#e6ebf5" font-size="13.5" font-weight="700">Access layer</text>
+          <text x="815" y="286" text-anchor="middle" fill="#8b96ad" font-size="10.5">live status page · REST API + Swagger · React dashboard</text>
+          <text x="815" y="300" text-anchor="middle" fill="#3ddc84" font-size="10">LAYER 5 · ACCESS</text>
+
+          <!-- arrows -->
+          <line x1="164" y1="46" x2="202" y2="46" stroke="#5a6680" stroke-width="1.6" marker-end="url(#arr)"/>
+          <line x1="400" y1="46" x2="438" y2="46" stroke="#3ddc84" stroke-width="1.6" marker-end="url(#arrg)"/>
+          <line x1="770" y1="46" x2="808" y2="46" stroke="#5a6680" stroke-width="1.6" marker-end="url(#arr)"/>
+
+          <path d="M 605 94 L 605 180 L 900 180 L 900 178" fill="none" stroke="#ffb454" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arr)"/>
+          <text x="752" y="172" text-anchor="middle" fill="#ffb454" font-size="10">health checks every 5 min</text>
+
+          <path d="M 900 76 L 900 150 L 384 150 L 384 236" fill="none" stroke="#4285f4" stroke-width="1.5" marker-end="url(#arr)"/>
+          <text x="700" y="142" text-anchor="middle" fill="#4285f4" font-size="10">history → ML / insights</text>
+
+          <line x1="384" y1="276" x2="638" y2="276" stroke="#4285f4" stroke-width="1.5" marker-end="url(#arr)"/>
+          <text x="511" y="268" text-anchor="middle" fill="#5a6680" font-size="10">insights</text>
+        </g>
+      </svg>
+      <div class="arch-legend">
+        <span class="li"><span class="sw" style="background:#3ddc84"></span>live (data plane)</span>
+        <span class="li"><span class="sw" style="background:#5a6680"></span>request flow</span>
+        <span class="li"><span class="sw" style="background:#ffb454"></span>monitoring</span>
+        <span class="li"><span class="sw" style="background:#4285f4"></span>intelligence</span>
+        <span class="li"><span class="sw" style="background:#2c3d66"></span>planned</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== INTELLIGENCE ===================== -->
+  <section id="intelligence">
+    <div class="sec-head"><h2>Intelligence layer</h2><span class="tag">the differentiators</span></div>
+    <div class="rule"></div>
+    <div class="intel-grid">
+      <div class="intel">
+        <div class="ic" style="background:rgba(61,220,132,.1)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="#3ddc84" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+        <h3>Cost intelligence</h3>
+        <div class="big accent-g">$40/mo <span style="font-size:13px;color:var(--muted)">saved</span></div>
+        <p>3 free tiers vs one paid single-cloud instance — the calculation is shown, not hidden.</p>
+      </div>
+      <div class="intel">
+        <div class="ic" style="background:rgba(79,214,232,.1)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 21c4.4-3 7-6.5 7-10a7 7 0 1 0-14 0c0 3.5 2.6 7 7 10Z" stroke="#4fd6e8" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 21V9" stroke="#4fd6e8" stroke-width="1.7"/></svg></div>
+        <h3>Carbon awareness</h3>
+        <p>Routes toward the region with the lowest grid carbon intensity (gCO₂/kWh) — live via Electricity Maps, or published averages as fallback.</p>
+      </div>
+      <div class="intel">
+        <div class="ic" style="background:rgba(66,133,244,.1)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2 4 5v6c0 5 3.4 8.6 8 11 4.6-2.4 8-6 8-11V5l-8-3Z" stroke="#4285f4" stroke-width="1.7" stroke-linejoin="round"/><path d="M8.6 12.2l2.3 2.3 4.5-4.6" stroke="#4285f4" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3>Security + policy</h3>
+        <p>Trivy (container) &amp; Checkov (IaC) scan every push in CI. OPA/Rego policies gate deployments — violations fail the pipeline.</p>
+      </div>
+      <div class="intel">
+        <div class="ic" style="background:rgba(160,107,255,.1)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="2.4" fill="#a06bff"/><circle cx="5" cy="7" r="2" fill="#a06bff"/><circle cx="19" cy="6" r="2" fill="#a06bff"/><circle cx="5" cy="17" r="2" fill="#a06bff"/><circle cx="19" cy="17" r="2" fill="#a06bff"/><path d="M7 7l3 3M17 6l-3 3M7 17l3-3M17 17l-3-3" stroke="#a06bff" stroke-width="1.3"/></svg></div>
+        <h3>Predictive failover (ML)</h3>
+        <div id="riskBox"><div class="risk-line" style="color:var(--muted)">loading risk data…</div></div>
+        <p>Isolation Forest learns each cloud's normal latency and flags it <i>before</i> it fails.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== ROADMAP ===================== -->
+  <section id="roadmap">
+    <div class="sec-head"><h2>Roadmap</h2><span class="tag">6-month major project</span></div>
+    <div class="rule"></div>
+    <div class="road">
+      <div class="mile"><div class="mk done">1<div class="line"></div></div>
+        <div class="body"><div class="mh"><h3>Research &amp; design</h3><span class="when">Month 1 · ✅ done</span></div>
+        <p>SRS, architecture diagrams, repo structure, GitHub Projects board.</p></div></div>
+      <div class="mile"><div class="mk done">2<div class="line"></div></div>
+        <div class="body"><div class="mh"><h3>Core infrastructure</h3><span class="when">Month 2 · ✅ done</span></div>
+        <p>Express app + Docker, 2 live clouds (Render + Vercel), IaC (OpenTofu), CI/CD with security scanning.</p></div></div>
+      <div class="mile"><div class="mk done">3<div class="line"></div></div>
+        <div class="body"><div class="mh"><h3>Orchestration</h3><span class="when">Month 3 · ✅ done</span></div>
+        <p>Health monitor (every 5 min → Supabase), Cloudflare failover router, live status page.</p></div></div>
+      <div class="mile"><div class="mk done">4<div class="line"></div></div>
+        <div class="body"><div class="mh"><h3>Intelligence</h3><span class="when">Month 4 · ✅ built</span></div>
+        <p>Cost, carbon, OPA policy, Trivy/Checkov, ML predictive failover (Isolation Forest).</p></div></div>
+      <div class="mile"><div class="mk next">5<div class="line"></div></div>
+        <div class="body"><div class="mh"><h3>Product layer</h3><span class="when">Month 5 · next</span></div>
+        <p>Auth + API keys, REST API with Swagger docs, React dashboard, k6 load testing.</p></div></div>
+      <div class="mile"><div class="mk next">6</div>
+        <div class="body"><div class="mh"><h3>Hardening &amp; defense</h3><span class="when">Month 6 · next</span></div>
+        <p>Unit test suite, final report, demo video, viva preparation.</p></div></div>
+    </div>
+  </section>
+
+  <!-- ===================== STACK ===================== -->
+  <section id="stack">
+    <div class="sec-head"><h2>Tech stack</h2><span class="tag">every tool free / open source</span></div>
+    <div class="rule"></div>
+    <div class="chips">
+      <span class="chip"><b>Node.js</b> + Express</span>
+      <span class="chip"><b>Docker</b></span>
+      <span class="chip"><b>Render</b> free tier</span>
+      <span class="chip"><b>Vercel</b> free tier</span>
+      <span class="chip"><b>Cloudflare Workers</b></span>
+      <span class="chip"><b>Supabase</b> Postgres</span>
+      <span class="chip"><b>GitHub Actions</b> CI/CD</span>
+      <span class="chip"><b>OpenTofu</b> IaC</span>
+      <span class="chip"><b>scikit-learn</b> ML</span>
+      <span class="chip"><b>OPA</b> policy</span>
+      <span class="chip"><b>Trivy</b> + <b>Checkov</b></span>
+      <span class="chip"><b>k6</b> load test</span>
+      <span class="chip"><b>React</b> dashboard</span>
+    </div>
+  </section>
+</div>
+
+<footer>
+  <div class="wrap">
+    <div class="logo" style="font-size:14px">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2 4 5v6c0 5 3.4 8.6 8 11 4.6-2.4 8-6 8-11V5l-8-3Z" stroke="#3ddc84" stroke-width="1.7" stroke-linejoin="round"/></svg>
+      Aegis — Self-Healing Multi-Cloud Platform
+    </div>
+    <div class="links">
+      <a href="https://aegis-router.manav32478.workers.dev" target="_blank" rel="noopener">Failover router</a>
+      <a href="https://aegis-router.manav32478.workers.dev/status" target="_blank" rel="noopener">Live status page</a>
+      <a href="https://aegis-platform-pomf.onrender.com/health" target="_blank" rel="noopener">Render /health</a>
+      <a href="https://aegis-platform-lyart.vercel.app/health" target="_blank" rel="noopener">Vercel /health</a>
+      <a href="https://github.com/Manav32478/aegis-platform-" target="_blank" rel="noopener">GitHub repo</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ================= CONFIG (edit these if URLs change) ================= */
+var CONFIG = {
+  supabaseUrl: 'https://kagjbxxmdyaypfcqemem.supabase.co',
+  supabaseKey: 'sb_publishable_cwauqX8Hq9ORgefEDU38cA_H4I-4qti',
+  routerUrl: 'https://aegis-router.manav32478.workers.dev',
+  clouds: [
+    { name: 'render',  label: 'Render',  role: 'Cloud · free tier', url: 'https://aegis-platform-pomf.onrender.com', color: '#3ddc84', planned: false },
+    { name: 'vercel',  label: 'Vercel',  role: 'Cloud · free tier', url: 'https://aegis-platform-lyart.vercel.app',     color: '#4285f4', planned: false },
+    { name: 'google-cloud-run', label: 'Google Cloud Run', role: 'Cloud · planned', url: null, color: '#ffb454', planned: true },
+    { name: 'oracle-cloud',      label: 'Oracle Cloud',     role: 'Cloud · planned', url: null, color: '#ff5d5d', planned: true },
+  ]
+};
+
+var $ = function (id) { return document.getElementById(id); };
+var demo = false;
+var liveMetrics = { checks: 0, lastAt: null, uptime: {}, avgLatency: {}, latest: {} };
+
+function headers() { return { apikey: CONFIG.supabaseKey, Authorization: 'Bearer ' + CONFIG.supabaseKey }; }
+function fmtAgo(iso) {
+  if (!iso) return '—';
+  var s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  return Math.floor(s / 86400) + 'd ago';
+}
+
+/* ---------- live status grid ---------- */
+function nodeCard(id, iconSvg, label, role, accent, url, planned) {
+  return '<div class="node" style="--accent:' + accent + '">'
+    + '<div class="row"><div class="ic">' + iconSvg + '</div>'
+    + '<div><div class="nm">' + label + '</div><div class="role">' + role + '</div></div>'
+    + '<div class="state" id="' + id + '-state"></div></div>'
+    + '<div class="stats" id="' + id + '-stats"></div>'
+    + '<div class="url">' + (planned ? 'planned — coming in Month 3' : (url || '')) + '</div>'
+    + '</div>';
+}
+
+function renderGrid() {
+  var grid = $('statusGrid');
+  var html = nodeCard('router', routerIcon(), 'Cloudflare Router', 'Failover · edge', '#3ddc84', CONFIG.routerUrl, false);
+  CONFIG.clouds.forEach(function (c) {
+    html += nodeCard('cloud-' + c.name, cloudIcon(), c.label, c.role, c.color, c.url, c.planned);
+  });
+  html += nodeCard('db', dbIcon(), 'Supabase', 'Database · monitoring', '#ffb454', CONFIG.supabaseUrl, false);
+  grid.innerHTML = html;
+  fillRouter();
+  CONFIG.clouds.forEach(function (c) { fillCloud(c); });
+  fillDb();
+}
+
+function setState(id, cls, text) { var el = $(id + '-state'); if (el) el.innerHTML = '<span class="pill ' + cls + '">' + text + '</span>'; }
+function setStats(id, items) {
+  var el = $(id + '-stats'); if (!el) return;
+  el.innerHTML = items.map(function (i) {
+    return '<div class="st"><div class="k">' + i[0] + '</div><div class="v">' + i[1] + '</div></div>';
+  }).join('');
+}
+
+function fillRouter() {
+  setState('router', 'na', 'checking…');
+  setStats('router', [['Role', 'edge'], ['Failover', '<1s']]);
+  fetch(CONFIG.routerUrl + '/health', { signal: AbortSignal.timeout(8000) })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d && d.cloud) {
+        setState('router', 'up', 'LIVE');
+        setStats('router', [['Routing to', d.cloud], ['Failover', '<1s']]);
+      }
+    }).catch(function () { if (demo) setState('router', 'na', 'offline'); });
+}
+
+function fillCloud(c) {
+  var id = 'cloud-' + c.name;
+  if (c.planned) { setState(id, 'na', 'PLANNED'); setStats(id, [['Status', '—'], ['Uptime', '—']]); return; }
+  var u = liveMetrics.uptime[c.name];
+  var l = liveMetrics.latest[c.name];
+  setState(id, 'na', 'checking…');
+  setStats(id, [['Uptime', (u != null ? u + '%' : '—')], ['Checks', liveMetrics.checksByCloud && liveMetrics.checksByCloud[c.name] || '—']]);
+  fetch(c.url + '/health', { signal: AbortSignal.timeout(8000) })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d && d.status === 'ok') {
+        setState(id, 'up', 'UP');
+        setStats(id, [['Latency', l ? l + ' ms' : 'live'], ['Uptime', (u != null ? u + '%' : '100%')]]);
+      } else throw new Error('not ok');
+    })
+    .catch(function () {
+      // fall back to Supabase latest if direct ping blocked
+      if (l != null) {
+        setState(id, l.healthy ? 'up' : 'down', l.healthy ? 'UP' : 'DOWN');
+        setStats(id, [['Latency', l.latency != null ? l.latency + ' ms' : '—'], ['Uptime', (u != null ? u + '%' : '—'), ['Last', fmtAgo(l.checked_at)]]);
+      } else if (demo) {
+        setState(id, 'na', 'offline');
+      }
+    });
+}
+
+function fillDb() {
+  setState('db', 'na', 'checking…');
+  setStats('db', [['Checks', '—'], ['Tables', '4']]);
+  fetch(CONFIG.supabaseUrl + '/rest/v1/health_checks?select=id&limit=1', { headers: headers(), signal: AbortSignal.timeout(8000) })
+    .then(function (r) { return r.json(); })
+    .then(function () {
+      setState('db', 'up', 'CONNECTED');
+      setStats('db', [['Checks', liveMetrics.checks || '—'], ['Tables', '4']]);
+    }).catch(function () { if (demo) setState('db', 'na', 'offline'); });
+}
+
+/* ---------- history from Supabase ---------- */
+function loadHistory() {
+  return fetch(CONFIG.supabaseUrl + '/rest/v1/health_checks?select=cloud_name,healthy,latency,checked_at&order=id.desc&limit=500', { headers: headers(), signal: AbortSignal.timeout(10000) })
+    .then(function (r) { return r.json(); })
+    .then(function (rows) {
+      if (!Array.isArray(rows)) throw new Error('bad');
+      var per = {}, checksBy = {};
+      rows.forEach(function (r) {
+        per[r.cloud_name] = per[r.cloud_name] || { n: 0, ok: 0, lat: 0, latN: 0 };
+        checksBy[r.cloud_name] = (checksBy[r.cloud_name] || 0) + 1;
+        var p = per[r.cloud_name]; p.n += 1;
+        if (r.healthy) p.ok += 1;
+        if (r.latency != null) { p.lat += r.latency; p.latN += 1; }
+        if (!liveMetrics.latest[r.cloud_name]) liveMetrics.latest[r.cloud_name] = r;
+      });
+      liveMetrics.checksByCloud = checksBy;
+      liveMetrics.checks = rows.length;
+      liveMetrics.lastAt = rows.length ? rows[0].checked_at : null;
+      Object.keys(per).forEach(function (k) {
+        liveMetrics.uptime[k] = Math.round((per[k].ok / per[k].n) * 100);
+        liveMetrics.avgLatency[k] = per[k].latN ? Math.round(per[k].lat / per[k].latN) : null;
+      });
+    });
+}
+
+function loadRisk() {
+  return fetch(CONFIG.supabaseUrl + '/rest/v1/risk_flags?select=cloud_name,flagged_at&order=id.desc&limit=50', { headers: headers(), signal: AbortSignal.timeout(10000) })
+    .then(function (r) { return r.json(); })
+    .then(function (rows) {
+      if (!Array.isArray(rows)) throw new Error('bad');
+      var latest = {};
+      rows.forEach(function (r) { if (!latest[r.cloud_name]) latest[r.cloud_name] = r; });
+      var names = Object.keys(latest);
+      var box = $('riskBox');
+      if (!names.length) {
+        box.innerHTML = '<div class="risk-line" style="color:var(--green)">✓ no clouds flagged — all healthy</div>';
+      } else {
+        box.innerHTML = names.map(function (n) {
+          return '<div class="risk-line"><span class="pill warn">⚠ ' + n + '</span><span style="color:var(--muted);font-size:12px">' + fmtAgo(latest[n].flagged_at) + '</span></div>';
+        }).join('');
+      }
+    });
+}
+
+/* ---------- metrics ---------- */
+function fillMetrics() {
+  if (liveMetrics.checks) {
+    var ups = Object.keys(liveMetrics.uptime);
+    var overall = ups.length ? Math.round(ups.reduce(function (a, k) { return a + liveMetrics.uptime[k]; }, 0) / ups.length) : 0;
+    $('mUptime').innerHTML = overall + '<small>%</small>';
+    $('mClouds').textContent = ups.length;
+    $('statusTag').textContent = 'live from Supabase · ' + liveMetrics.checks + ' checks · last ' + fmtAgo(liveMetrics.lastAt);
+  }
+}
+
+/* ---------- icons ---------- */
+function routerIcon() {
+  return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 12h18M3 12a9 9 0 0 1 18 0M3 12v3h18v-3M7 15h.01M11 15h.01" stroke="#3ddc84" stroke-width="1.7" stroke-linecap="round"/></svg>';
+}
+function cloudIcon() {
+  return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M7 18a4.5 4.5 0 0 1-.4-9A6 6 0 0 1 18.3 10.5 4 4 0 0 1 17.5 18H7Z" stroke="#e6ebf5" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+}
+function dbIcon() {
+  return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="5.5" rx="8" ry="3" stroke="#ffb454" stroke-width="1.6"/><path d="M4 5.5v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6M4 11.5v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" stroke="#ffb454" stroke-width="1.6"/></svg>';
+}
+
+/* ---------- boot ---------- */
+function demoFallback() {
+  demo = true;
+  $('modeLive').style.display = 'none';
+  $('modeDemo').style.display = 'flex';
+  liveMetrics = {
+    checks: 0, lastAt: null,
+    uptime: { render: 100, vercel: 100 },
+    avgLatency: { render: 393, vercel: 483 },
+    latest: {
+      render:  { healthy: true, latency: 393, checked_at: new Date(Date.now() - 300000).toISOString() },
+      vercel:  { healthy: true, latency: 483, checked_at: new Date(Date.now() - 300000).toISOString() },
+    },
+    checksByCloud: { render: 1420, vercel: 1420 },
+  };
+  $('mUptime').innerHTML = '100<small>%</small>';
+  $('mClouds').textContent = '2';
+  $('statusTag').textContent = 'offline preview — sample data (open with internet for live)';
+  $('riskBox').innerHTML = '<div class="risk-line" style="color:var(--green)">✓ no clouds flagged — all healthy</div>';
+  renderGrid();
+}
+
+renderGrid(); // initial skeleton
+
+Promise.allSettled([loadHistory(), loadRisk()])
+  .then(function (results) {
+    var historyOk = results[0].status === 'fulfilled';
+    if (historyOk && liveMetrics.checks > 0) {
+      $('modeDemo').style.display = 'none';
+      renderGrid();
+      fillMetrics();
+    } else if (!historyOk || liveMetrics.checks === 0) {
+      demoFallback();
+    } else {
+      renderGrid(); fillMetrics();
+    }
+  });
+</script>
+</body>
+</html>

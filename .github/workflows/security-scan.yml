@@ -1,0 +1,32 @@
+# Security scanning — Month 4.4
+name: Security scan
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy image scan (fail on HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: app/
+          format: table
+          exit-code: '1'
+          severity: HIGH,CRITICAL
+
+  checkov:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkov IaC misconfiguration scan
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infra/
+          output_format: cli
+          soft_fail: false

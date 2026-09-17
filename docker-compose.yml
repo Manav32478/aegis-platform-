@@ -1,0 +1,49 @@
+# Aegis v2 — run the ENTIRE platform locally, professionally.
+#
+#   docker compose up --build
+#
+# Services:
+#   web     → portal (landing + dashboard + status + admin)   http://localhost:3100
+#   api     → multi-tenant API + Swagger                      http://localhost:4000/api-docs
+#   monitor → health monitor + self-heal + alerts + reports   (one-shot, then loop)
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    ports:
+      - "3100:3100"
+    environment:
+      - PORT=3100
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-admin}
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+
+  monitor:
+    build:
+      context: .
+      dockerfile: orchestration/Dockerfile
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - MONITOR_REGION=oracle-vm
+      - MONITOR_INTERVAL_S=300
+      - TARGETS=${TARGETS:-}
+      - GITHUB_REPO=${GITHUB_REPO:-Manav32478/aegis-platform-}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+    restart: unless-stopped

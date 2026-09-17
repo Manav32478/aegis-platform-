@@ -1,0 +1,10 @@
+{
+  "name": "aegis-orchestration",
+  "version": "2.0.0",
+  "description": "Aegis monitor + self-heal + alerting + reports (zero runtime deps)",
+  "main": "monitor.js",
+  "scripts": {
+    "start": "node monitor.js",
+    "report": "node report.js"
+  }
+}

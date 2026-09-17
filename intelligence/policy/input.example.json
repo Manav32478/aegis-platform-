@@ -1,0 +1,7 @@
+{
+  "resource": {
+    "type": "bucket",
+    "public": true,
+    "tags": { "team": "" }
+  }
+}

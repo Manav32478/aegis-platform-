@@ -1,0 +1,12 @@
+{
+  "name": "aegis-app",
+  "version": "1.0.0",
+  "description": "Aegis core app — deployed to 3 clouds",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

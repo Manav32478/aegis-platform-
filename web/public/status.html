@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aegis — Public Status</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="/assets/aegis.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="/"><span class="logo">🛡️</span> Aegis</a>
+  <nav class="nav">
+    <a href="/">Overview</a>
+    <a href="/dashboard.html">Dashboard</a>
+    <a href="/status.html" class="active">Public Status</a>
+    <a href="/admin.html">Admin</a>
+  </nav>
+  <button class="theme-toggle" id="theme-btn" title="Toggle theme" onclick="Aegis.toggleTheme()">☀️</button>
+</header>
+
+<div class="wrap">
+  <div class="section-head" style="margin-top:8px">
+    <div>
+      <h1 style="font-size:26px;margin-bottom:2px">Public status</h1>
+      <span class="muted small">this page needs no login — share it with whoever depends on your app</span>
+    </div>
+    <span class="badge-live">updates 15s</span>
+  </div>
+
+  <div class="grid cols-3" id="status-cards"></div>
+
+  <div class="section-head"><h2>Recent incidents</h2></div>
+  <div class="card"><ul class="timeline" id="incidents"><li class="muted">loading…</li></ul></div>
+
+  <footer>
+    <span>Aegis · public status · no key required</span>
+    <span>Powered by Supabase + multi-region monitors</span>
+  </footer>
+</div>
+
+<script src="/assets/aegis.js"></script>
+<script>
+(function () {
+  function render(d) {
+    const el = document.getElementById('status-cards');
+    const names = Object.keys(d.analytics || {});
+    if (!names.length) {
+      el.innerHTML = '<div class="card"><h3>No data yet</h3><p class="muted">The monitor has not recorded any checks.</p></div>';
+    } else {
+      el.innerHTML = names.map(n => {
+        const a = d.analytics[n];
+        const up = a.last && a.last.healthy;
+        return '<div class="card">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center">' +
+            '<h3><span class="dot ' + (up ? 'up' : 'down') + '"></span>' + n + '</h3>' +
+            '<span class="pill ' + (up ? 'up' : 'down') + '">' + (up ? 'Operational' : 'Down') + '</span>' +
+          '</div>' +
+          '<div class="stat" style="margin:10px 0 2px"><span class="value" style="font-size:22px">' + (a.uptimePct ?? '—') + '%</span><span class="label">uptime</span></div>' +
+          '<table>' +
+            '<tr><td>Avg latency</td><td style="text-align:right">' + (a.avgLatencyMs != null ? a.avgLatencyMs + ' ms' : '—') + '</td></tr>' +
+            '<tr><td>Last check</td><td style="text-align:right">' + Aegis.fmtAgo(a.last && a.last.checked_at) + '</td></tr>' +
+          '</table></div>';
+      }).join('');
+    }
+    const inc = d.incidents || [];
+    const li = document.getElementById('incidents');
+    li.innerHTML = inc.length
+      ? inc.slice(0, 12).map(i =>
+          '<li class="' + (i.ended_at ? 'info' : 'critical') + '"><div><strong>' + i.cloud_name + '</strong> — ' +
+          (i.ended_at ? 'recovered (' + Aegis.fmtDuration(i.duration_seconds) + ' downtime)' : 'currently down') +
+          '</div><div class="when">' + Aegis.fmtAgo(i.started_at) + '</div></li>').join('')
+      : '<li class="info"><div>No incidents on record.</div></li>';
+  }
+
+  async function refresh() {
+    try { render(await Aegis.load()); }
+    catch (e) { Aegis.toast('Could not load status: ' + e.message, true); }
+  }
+  Aegis.on('aegis:data', render);
+  Aegis.startLive();
+  refresh();
+})();
+</script>
+</body>
+</html>

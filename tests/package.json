@@ -1,0 +1,11 @@
+{
+  "name": "aegis-tests",
+  "version": "2.0.0",
+  "description": "Unit + integration tests for Aegis core logic (analytics, anomaly, failover, cost, monitor)",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}

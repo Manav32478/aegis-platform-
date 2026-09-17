@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aegis — Multi-Cloud Failover Demo</title>
+<style>
+  :root { --bg:#0b0f1a; --panel:#131a2b; --border:#243047; --text:#e6ebf5; --muted:#8b96ad; --green:#3ddc84; --red:#ff5d5d; --amber:#ffb454; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 18px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; letter-spacing:.3px; }
+  .badge { font-size:12px; padding:4px 10px; border-radius:999px; background:#1c2a4a; color:#9db4ff; border:1px solid #2c3d66; }
+  .active-badge { background:rgba(61,220,132,.12); color:var(--green); border-color:rgba(61,220,132,.35); }
+  main { max-width: 1080px; margin: 0 auto; padding: 22px; display:grid; gap:18px; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:16px; }
+  .card { background: var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px; }
+  .top { display:flex; justify-content:space-between; align-items:center; }
+  .dot { width:10px; height:10px; border-radius:50%; background:var(--muted); display:inline-block; margin-right:8px; }
+  .dot.up { background:var(--green); box-shadow:0 0 8px rgba(61,220,132,.6); }
+  .dot.down { background:var(--red); box-shadow:0 0 8px rgba(255,93,93,.6); }
+  .latency { font-size:26px; font-weight:600; margin:10px 0 2px; }
+  .muted { color: var(--muted); font-size:12px; }
+  .uptime { height:6px; border-radius:3px; background:#1d2740; overflow:hidden; margin-top:10px; }
+  .uptime > div { height:100%; background:var(--green); }
+  .btn { background:#1c2a4a; border:1px solid #2c3d66; color:var(--text); padding:8px 12px; border-radius:9px; cursor:pointer; font-size:13px; }
+  .btn:hover { background:#24365e; }
+  .btn.danger { background:rgba(255,93,93,.12); border-color:rgba(255,93,93,.35); color:#ff8a8a; }
+  .btn.chaos { background:rgba(255,180,84,.12); border-color:rgba(255,180,84,.4); color:var(--amber); font-weight:600; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .big { font-size:30px; font-weight:700; }
+  canvas { width:100%; height:220px; display:block; }
+  .grid2 { display:grid; grid-template-columns: 2fr 1fr; gap:16px; }
+  @media (max-width: 800px) { .grid2 { grid-template-columns: 1fr; } }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  td, th { text-align:left; padding:6px 8px; border-bottom:1px solid var(--border); }
+  .pill { font-size:11px; padding:2px 8px; border-radius:999px; }
+  .pill.up { background:rgba(61,220,132,.12); color:var(--green); }
+  .pill.down { background:rgba(255,93,93,.14); color:var(--red); }
+  #toast { position:fixed; bottom:20px; right:20px; background:#1c2a4a; border:1px solid #2c3d66; padding:12px 16px; border-radius:12px; display:none; max-width:320px; z-index:10; }
+  code { background:#1d2740; padding:1px 6px; border-radius:6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚔️ Aegis</h1>
+  <span class="badge">multi-cloud failover demo</span>
+  <span id="activeBadge" class="badge active-badge">active: —</span>
+  <span style="flex:1"></span>
+  <button class="btn chaos" onclick="runChaos()">🔥 Run chaos test (kill a random cloud for 20s)</button>
+</header>
+<main>
+  <div class="grid" id="clouds"></div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <strong>Latency (ms) — per cloud</strong>
+        <span class="muted">monitor polls every 5s</span>
+      </div>
+      <canvas id="chart" width="960" height="220"></canvas>
+    </div>
+    <div class="card">
+      <strong>💸 Cost intelligence</strong>
+      <div class="muted" style="margin:8px 0">Estimated monthly saving vs one paid single-cloud instance</div>
+      <div class="big" id="saved">$0</div>
+      <table id="costTable"></table>
+      <div class="muted" style="margin-top:8px">Illustrative rate — see <code>intelligence/cost.js</code>.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <strong>How failover works here</strong>
+    <p class="muted" style="line-height:1.6; margin:8px 0 0">
+      The router health-checks all three backends and always routes to the healthiest one.
+      Hit the chaos button: the victim is marked down, the monitor records the outage, and the router
+      shifts traffic to the next healthy cloud within one check — exactly what the production Cloudflare
+      Worker (<code>orchestration/router/src/worker.js</code>) does, but in milliseconds.
+    </p>
+  </div>
+</main>
+<div id="toast"></div>
+<script>
+const $ = (s) => document.querySelector(s);
+let history = {}; // cloud -> [{ts, latency}]
+const colors = ['#4285f4', '#c74634', '#46e3b7'];
+
+async function j(url, opts) { const r = await fetch(url, opts); return r.json(); }
+
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg; t.style.display = 'block';
+  clearTimeout(t._h); t._h = setTimeout(() => (t.style.display = 'none'), 4000);
+}
+
+async function refresh() {
+  const s = await j('/api/status');
+  const clouds = s.clouds || [];
+  $('#clouds').innerHTML = clouds.map((c) => `
+    <div class="card">
+      <div class="top">
+        <span><span class="dot ${c.healthy ? 'up' : 'down'}"></span>${c.label}</span>
+        <span class="pill ${c.healthy ? 'up' : 'down'}">${c.healthy ? 'UP' : 'DOWN'}</span>
+      </div>
+      <div class="latency">${c.latency == null ? '—' : c.latency + ' ms'}</div>
+      <div class="muted">${c.name}</div>
+      <div class="uptime"><div style="width:${c.uptimePct}%"></div></div>
+      <div class="muted" style="margin-top:6px">uptime ${c.uptimePct}% · ${c.checks} checks</div>
+      <div class="row" style="margin-top:10px">
+        ${c.forcedDown
+          ? `<button class="btn" onclick="chaos('${c.name}', false)">↩ Restore</button>`
+          : `<button class="btn danger" onclick="chaos('${c.name}', true)">✂ Force down</button>`}
+      </div>
+    </div>`).join('');
+  $('#activeBadge').textContent = s.active ? 'active: ' + s.active : 'active: NONE — all clouds down';
+}
+
+async function refreshChart() {
+  const d = await j('/api/history');
+  for (const h of (d.history || [])) {
+    (history[h.name] = history[h.name] || []).push({ ts: h.ts, latency: h.healthy ? h.latency : null });
+    if (history[h.name].length > 90) history[h.name].shift();
+  }
+  draw();
+}
+
+function draw() {
+  const cv = $('#chart');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height, pad = 30;
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = '#243047'; ctx.fillStyle = '#8b96ad'; ctx.font = '11px system-ui';
+  for (let yv = 0; yv <= 300; yv += 100) {
+    const y = H - pad - (yv / 300) * (H - pad * 2);
+    ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - 10, y); ctx.stroke();
+    ctx.fillText(yv, 4, y + 4);
+  }
+  const names = Object.keys(history);
+  if (!names.length) return;
+  const allTs = names.flatMap((n) => history[n].map((p) => p.ts));
+  const tMin = Math.min(...allTs), tMax = Math.max(...allTs) || tMin + 1;
+  names.forEach((name, i) => {
+    ctx.strokeStyle = colors[i % colors.length]; ctx.lineWidth = 2;
+    ctx.beginPath(); let started = false;
+    for (const p of history[name]) {
+      const x = pad + ((p.ts - tMin) / (tMax - tMin)) * (W - pad - 12);
+      const y = p.latency == null ? H - pad : H - pad - (Math.min(p.latency, 300) / 300) * (H - pad * 2);
+      if (p.latency == null) { started = false; continue; }
+      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fillText(name, W - 10 - ctx.measureText(name).width, 14 + i * 14);
+  });
+}
+
+async function chaos(cloud, down) {
+  await j('/api/chaos', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ cloud, down }) });
+  toast(down ? `⚠ ${cloud} marked DOWN — watch the router fail over` : `✅ ${cloud} restored`);
+  refresh();
+}
+
+async function runChaos() {
+  const r = await j('/api/chaos', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: 'auto' }) });
+  if (r.victim) toast(`🔥 Chaos test: ${r.victim} going down for ${r.restoresInSeconds}s`);
+  refresh();
+}
+
+async function cost() {
+  const c = await j('/api/cost');
+  $('#saved').textContent = '$' + c.savedUsd + '/mo';
+  $('#costTable').innerHTML = `
+    <tr><td>Monthly requests</td><td>${c.monthlyRequests.toLocaleString()}</td></tr>
+    <tr><td>Single paid cloud</td><td>$${c.singleCloudCostUsd}/mo</td></tr>
+    <tr><td>Aegis (3 free tiers)</td><td>$${c.aegisCostUsd}/mo</td></tr>`;
+}
+
+refresh(); refreshChart(); cost();
+setInterval(refresh, 2500);
+setInterval(refreshChart, 5000);
+</script>
+</body>
+</html>
