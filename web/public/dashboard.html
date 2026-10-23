@@ -414,6 +414,7 @@
     el.innerHTML = base + extra + ' Paid baseline $40/million (illustrative).';
   }
 
+  function drawCostChart(d) {
     const cv = document.getElementById('cost-chart');
     if (!cv) { return; }
     const ctx = cv.getContext('2d');
