@@ -1,0 +1,12 @@
+{
+  "name": "aegis-ecommerce-example",
+  "version": "1.0.0",
+  "description": "Demo e-commerce store you deploy to 3 clouds and protect with Aegis",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

@@ -117,7 +117,7 @@
     try {
       const res = await fetch('/api/admin/targets', { headers: headers() });
       if (res.status === 401) {
-        $('targets-body').innerHTML = '<tr><td class="muted">Set the admin token first.</td></tr>';
+        $('targets-body').innerHTML = '<tr><td class="muted">Set the admin token first (type aegis-demo → Save).</td></tr>';
         return;
       }
       const data = await res.json();
@@ -127,8 +127,11 @@
         '<td class="mono small">' + r.url + '</td>' +
         '<td class="muted">' + (r.region || '—') + '</td>' +
         '<td>' + (r.enabled ? '<span class="pill up">on</span>' : '<span class="pill muted">off</span>') + '</td>' +
-        '<td><button class="btn small" style="padding:5px 10px" onclick="toggleTarget(' + r.id + ',' + (r.enabled ? 'false' : 'true') + ')">' + (r.enabled ? 'disable' : 'enable') + '</button></td></tr>'
+        '<td><button class="btn" style="padding:5px 10px" data-toggle="' + r.id + '" data-enabled="' + (r.enabled ? '1' : '0') + '">' + (r.enabled ? 'disable' : 'enable') + '</button></td></tr>'
       ).join('') : '<tr><td class="muted">No targets configured.</td></tr>';
+      document.querySelectorAll('[data-toggle]').forEach(btn => {
+        btn.addEventListener('click', () => toggleTarget(btn.getAttribute('data-toggle'), btn.getAttribute('data-enabled') === '0'));
+      });
     } catch (e) {
       $('targets-body').innerHTML = '<tr><td class="muted">error: ' + e.message + '</td></tr>';
     }
@@ -161,6 +164,21 @@
     }).catch(e => Aegis.toast('Failed: ' + e.message, true));
   }
 
+  async function toggleTarget(id, enabled) {
+    try {
+      const res = await fetch('/api/admin/targets/' + id, {
+        method: 'PATCH', headers: headers(),
+        body: JSON.stringify({ enabled }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || res.status);
+      Aegis.toast(enabled ? 'Target enabled.' : 'Target disabled.');
+      loadTargets();
+    } catch (e) {
+      Aegis.toast('Failed: ' + e.message, true);
+    }
+  }
+
   function genKey() {
     fetch('/api/admin/keys', {
       method: 'POST', headers: headers(),
@@ -173,17 +191,26 @@
   }
 
   function genReport() {
+    show('report-out', 'Generating…');
     fetch('/api/admin/reports', { method: 'POST', headers: headers() })
       .then(async r => {
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || r.status);
         show('report-out', data);
-        Aegis.toast('Report generated.');
+        Aegis.toast('Report generated and stored in health_reports.');
       })
       .catch(e => Aegis.toast('Failed: ' + e.message, true));
   }
 
   function loadAll() { loadTargets(); loadAudit(); }
+
+  // expose to the inline onclick handlers
+  window.saveToken = saveToken;
+  window.addTarget = addTarget;
+  window.genKey = genKey;
+  window.genReport = genReport;
+  window.toggleTarget = toggleTarget;
+
   $('admin-token').value = token();
   $('token-status').innerHTML = token() ? 'Token loaded from this browser.' : $('token-status').innerHTML;
   loadAll();

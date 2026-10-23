@@ -25,7 +25,9 @@ app.use(express.json());
 app.disable('x-powered-by');
 
 const PORT = process.env.PORT || 3100;
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
+// Default demo token so the admin page works out of the box locally.
+// For any real deployment set ADMIN_TOKEN=your-strong-password.
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'aegis-demo';
 
 app.use((req, res, next) => {
   res.set('Access-Control-Allow-Origin', '*');
@@ -114,6 +116,28 @@ app.get('/badge/:cloud.svg', async (req, res) => {
   } catch (e) {
     res.status(502).send('error');
   }
+});
+
+// ---- WHO IS SERVING NOW (raw proxy check — the ultimate failover proof) ----
+app.get('/api/serving', async (req, res) => {
+  const results = [];
+  const urls = [process.env.RENDER_URL || 'https://aegis-platform-pomf.onrender.com',
+    process.env.VERCEL_URL || 'https://aegis-platform-lyart.vercel.app'];
+  for (const u of urls) {
+    try {
+      const r = await fetch(u + '/health', { signal: AbortSignal.timeout(5000) });
+      if (r.ok) {
+        const j = await r.json();
+        results.push({ cloud: j.cloud || u, requests: j.requests, uptimeSeconds: j.uptimeSeconds, direct: true });
+      }
+    } catch { /* skip */ }
+  }
+  try {
+    const r = await fetch('https://aegis-router.manav32478.workers.dev/health', { signal: AbortSignal.timeout(5000) });
+    const j = await r.json();
+    results.push({ cloud: j.cloud, requests: j.requests, uptimeSeconds: j.uptimeSeconds, viaRouter: true });
+  } catch { /* skip */ }
+  res.json({ checkedAt: new Date().toISOString(), results });
 });
 
 // ---- export (CSV) -----------------------------------------------------------
@@ -248,11 +272,45 @@ app.post('/api/admin/keys', requireAdmin, async (req, res) => {
   }
 });
 
+// ---- SECURITY CI STATUS: live from GitHub Actions (public repo, no auth) ----
+app.get('/api/security', async (req, res) => {
+  try {
+    const runs = await fetch(
+      'https://api.github.com/repos/Manav32478/aegis-platform-/actions/runs?per_page=12',
+      { headers: { 'User-Agent': 'aegis', Accept: 'application/vnd.github+json' } }
+    ).then((r) => r.json());
+    const workflows = (runs.workflow_runs || []);
+    const pick = (name) => workflows.find((w) => (w.name || '').toLowerCase().includes(name));
+    const one = (n) => {
+      const w = pick(n);
+      return w ? { status: w.status, conclusion: w.conclusion, at: w.created_at, url: w.html_url } : null;
+    };
+    res.json({
+      checkedAt: new Date().toISOString(),
+      sources: { githubActions: 'api.github.com (live)' },
+      runs: {
+        tests: one('deploy'),
+        monitor: one('health monitor'),
+        ml: one('predictive risk'),
+        security: one('security scan'),
+      },
+    });
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
 // ---- static + health ---------------------------------------------------------
 
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'aegis-web' }));
+
+// Same /health contract as the protected app, so the portal itself can be a
+// monitored cloud too (router/monitor can watch it).
+app.get('/health', (req, res) =>
+  res.json({ status: 'ok', cloud: 'aegis-web', uptimeSeconds: Math.round(process.uptime()), timestamp: Date.now() })
+);
 
 app.get('/metrics', async (req, res) => {
   try {

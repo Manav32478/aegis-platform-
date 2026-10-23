@@ -50,6 +50,26 @@
     </div>
   </div>
 
+  <!-- FAILOVER PROOF: who is actually serving traffic right now -->
+  <div class="section-head"><h2>🚦 Failover proof — who is serving traffic right now</h2></div>
+  <div class="grid cols-2">
+    <div class="card">
+      <h3>🌐 Via the Cloudflare router</h3>
+      <div class="sub">we ask the router "which cloud are you using?" — the answer changes if a cloud dies</div>
+      <div id="router-card"><p class="muted">checking…</p></div>
+      <button class="btn" style="margin-top:10px" onclick="refreshServing()">↻ Re-run proof now</button>
+    </div>
+    <div class="card">
+      <h3>🧪 How to confirm failover (for the demo)</h3>
+      <div class="sub" style="margin-bottom:10px">do these 3 things while the evaluator watches</div>
+      <ol class="muted" style="margin:0;padding-left:20px;line-height:1.7">
+        <li>Note the cloud named in the <strong>router card</strong> (e.g. <span class="mono">render</span>).</li>
+        <li>Pause that cloud in its dashboard (Render → Suspend).</li>
+        <li>Click <strong>↻ Re-run proof</strong> — the router now answers the <em>other</em> cloud. That is the failover, live.</li>
+      </ol>
+    </div>
+  </div>
+
   <!-- Per-cloud cards -->
   <div class="section-head"><h2>Cloud health</h2></div>
   <div class="grid cols-3" id="cloud-cards"></div>
@@ -88,6 +108,23 @@
       <div id="sla-list"><p class="muted">loading…</p></div>
     </div>
   </div>
+  <div class="grid cols-2" style="margin-top:16px">
+    <div class="card">
+      <h3>🛡️ Security CI — live</h3>
+      <div class="sub">real results from GitHub Actions, fetched right now</div>
+      <table id="security-list"><tbody><tr><td class="muted">loading…</td></tr></tbody></table>
+      <p class="muted small" id="security-src" style="margin-top:8px"></p>
+    </div>
+    <div class="card">
+      <h3>🛠️ How to deploy your own app (3 steps)</h3>
+      <div class="sub" style="margin-bottom:10px">put ANY app behind Aegis's failover</div>
+      <ol class="muted" style="margin:0;padding-left:20px;line-height:1.75">
+        <li><strong>Containerise</strong> your app and expose <span class="mono">/health</span>.</li>
+        <li><strong>Deploy</strong> the same image to Render, Vercel &amp; Cloud Run (see <span class="mono">docs/DEPLOYMENT.md</span>).</li>
+        <li><strong>Point</strong> the Cloudflare Worker at the 3 URLs — it now routes to the healthiest.</li>
+      </ol>
+    </div>
+  </div>
 
   <!-- Cost + carbon -->
   <div class="section-head"><h2>Cost &amp; carbon</h2></div>
@@ -96,10 +133,7 @@
       <h3>💸 Cost forecast (12 months)</h3>
       <div class="sub">single paid cloud vs Aegis free tiers</div>
       <canvas id="cost-chart" width="560" height="230"></canvas>
-      <p class="muted small" style="margin-top:10px">
-        Assumes 1,000,000 req/mo growing 10%/mo. Paid baseline <strong>$40/million</strong> (illustrative).
-        Cite: Cloud Run $0.40/million beyond free tier; Aegis runs inside free tiers.
-      </p>
+      <p class="muted small" id="cost-note" style="margin-top:10px">loading live request projection…</p>
     </div>
     <div class="card">
       <h3>🌱 Carbon-aware routing</h3>
@@ -200,12 +234,16 @@
       else { dot = 'down'; label = 'down'; colorCls = 'pill down'; }
       const barPct = p.healthy ? Math.max(6, Math.min(100, Math.round((p.latency || 0) / 10))) : 100;
       const barColor = p.enabled === false ? '#3a4a68' : (p.healthy ? (p.latency < 400 ? 'var(--green)' : 'var(--amber)') : 'var(--red)');
+      const counters = (p.requests != null)
+        ? '<div class="muted small" style="margin-top:4px">📊 ' + p.requests.toLocaleString() + ' requests served · up ' + Aegis.fmtDuration(p.uptimeSeconds) + '</div>'
+        : '';
       return '<div class="probe-row">' +
         '<span class="pulse ' + dot + '"></span>' +
         '<div class="grow"><div style="display:flex;justify-content:space-between;gap:8px">' +
           '<strong>' + p.name + '</strong><span class="' + colorCls + '">' + label + '</span></div>' +
-          '<div class="url">' + p.url + '/health</div>' +
+          '<div class="url">' + p.url + '</div>' +
           '<div class="bar" style="margin-top:6px"><i style="width:' + barPct + '%;background:' + barColor + '"></i></div>' +
+          counters +
         '</div></div>';
     }).join('');
   }
@@ -360,7 +398,22 @@
     });
   }
 
-  function drawCostChart(d) {
+  function renderCostNote(d) {
+    const el = document.getElementById('cost-note');
+    if (!el) { return; }
+    const counters = d.liveCounters || [];
+    let base = '<strong>projected ' + (d.monthlyRequests != null ? d.monthlyRequests.toLocaleString() : '1,000,000') +
+      ' req/mo</strong> (extrapolated from live cloud request counters' +
+      (counters.length ? ': ' + counters.map(function (c) { return c.cloud + ' ' + Math.round(c.perHour) + '/h'; }).join(', ') : '') + '), growing 10%/mo.';
+    let extra = '';
+    if (d.cloudRunOverage && d.cloudRunOverage.overageRequests > 0) {
+      extra = ' Cloud Run overage would be $' + d.cloudRunOverage.overageCostUsd.toFixed(2) + '/mo (still free below 2M).';
+    } else {
+      extra = ' Cloud Run stays within its 2M free tier — $0.';
+    }
+    el.innerHTML = base + extra + ' Paid baseline $40/million (illustrative).';
+  }
+
     const cv = document.getElementById('cost-chart');
     if (!cv) { return; }
     const ctx = cv.getContext('2d');
@@ -392,9 +445,24 @@
     const el = document.getElementById('risk-list');
     const names = Object.keys(d.analytics || {});
     const risky = names.filter(function (n) { return d.riskMap[n]; });
-    el.innerHTML = risky.length
-      ? risky.map(function (n) { return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #22304a"><span><span class="pill warn">⚠ ' + n + '</span></span><span class="muted small">flagged by detector</span></div>'; }).join('')
-      : '<p class="muted" style="color:var(--green)">All clouds stable — no anomalies detected.</p>';
+    if (risky.length) {
+      el.innerHTML = risky.map(function (n) { return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #22304a"><span><span class="pill warn">⚠ ' + n + '</span></span><span class="muted small">flagged by detector</span></div>'; }).join('');
+      return;
+    }
+    // live ML z-scores per cloud (computed on every 10s tick — not static)
+    const rows = names.map(function (n) {
+      const m = d.mlScores && d.mlScores[n];
+      if (!m || m.zScore == null) {
+        return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #22304a"><span>' + n + '</span><span class="muted small">collecting…</span></div>';
+      }
+      const z = m.zScore;
+      const ok = Math.abs(z) < 2.5;
+      return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #22304a">' +
+        '<span>' + n + ' <span class="muted small">(baseline ' + m.baseline + ' ms)</span></span>' +
+        '<span class="pill ' + (ok ? 'muted' : 'warn') + '">z = ' + z + (ok ? ' · stable' : ' · ⚠') + '</span></div>';
+    }).join('');
+    el.innerHTML = rows +
+      '<p class="muted small" style="margin-top:8px">No anomalies — z-scores recomputed live every 10 s from real latency history.</p>';
   }
 
   function renderRoute(d) {
@@ -408,6 +476,41 @@
       '<div class="stat" style="margin-bottom:8px"><span class="value" style="font-size:24px">→ ' + Aegis.cap(r.route) + '</span></div>' +
       '<p class="muted">' + r.reason + '</p>' +
       (r.fallback ? '<p class="small muted">Failover standby: <strong>' + Aegis.cap(r.fallback) + '</strong></p>' : '');
+  }
+
+  // ---- failover proof: the router's live answer + body strings for print ----
+  function liveRouterText(dat) {
+    const items = (dat.results || []).map(function (x) {
+      const tag = x.viaRouter ? 'via CLOUDFLARE ROUTER' : 'DIRECT (' + x.cloud + ')';
+      return '<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #22304a">' +
+        '<div><strong>' + x.cloud + '</strong><div class="muted small">' + tag + '</div></div>' +
+        '<div style="text-align:right"><strong>' + (x.requests != null ? x.requests.toLocaleString() : '—') + '</strong><div class="muted small">requests · up ' + (x.uptimeSeconds != null ? Aegis.fmtDuration(x.uptimeSeconds) : '—') + '</div></div>' +
+        '</div>';
+    }).join('');
+    if (!items) {
+      return '<div class="muted">The browser could not reach the router — it will appear here when online.</div>';
+    }
+    const viaRouter = (dat.results || []).find(function (x) { return x.viaRouter; });
+    const direct = (dat.results || []).filter(function (x) { return x.direct; });
+    const names = direct.map(function (x) { return x.cloud; });
+    let verdict = '';
+    if (viaRouter) {
+      if (direct.length && !names.includes(viaRouter.cloud)) {
+        // direct cloud that is serving differs from router's choice? (unusual) — show facts
+        verdict = '<p class="muted small" style="margin-top:6px">Router serves <strong>' + viaRouter.cloud + '</strong> · direct clouds: ' + names.join(', ') + '</p>';
+      } else {
+        verdict = '<p class="muted small" style="margin-top:6px">Router serves <strong>' + viaRouter.cloud + '</strong> — same cloud is reachable directly.</p>';
+      }
+    }
+    return items + verdict;
+  }
+
+  function renderRouter(dat) {
+    const el = document.getElementById('router-card');
+    if (!el) { return; }
+    el.innerHTML = liveRouterText(dat || {});
+    const box = document.getElementById('router-verdict');
+    if (box) box.textContent = '';
   }
 
   function renderSla(d) {
@@ -479,6 +582,7 @@
     renderProbes(d);
     renderCloudCards(d);
     drawCharts(d);
+    renderCostNote(d);
     renderRisk(d);
     renderRoute(d);
     renderSla(d);
@@ -491,6 +595,45 @@
       function (i) { return '<strong>' + Aegis.cap(i.kind) + '</strong> — ' + i.message; });
     renderFailover(d);
     renderBadges(d);
+    // failover proof (router state) — independent of the stream
+    loadServing();
+    // live security CI status (GitHub Actions)
+    loadSecurity();
+  }
+
+  async function loadServing() {
+    try {
+      const res = await fetch('/api/serving');
+      if (res.ok) renderRouter(await res.json());
+    } catch { /* offline */ }
+  }
+
+  window.refreshServing = async function () {
+    const btn = document.querySelector('#router-card');
+    if (btn) { /* no-op marker */ }
+    await loadServing();
+    Aegis.toast('Failover proof re-run — router asked live.');
+  };
+
+  async function loadSecurity() {
+    const el = document.getElementById('security-list');
+    if (!el) { return; }
+    try {
+      const res = await fetch('/api/security');
+      if (!res.ok) throw new Error(res.status);
+      const j = await res.json();
+      const row = function (label, r) {
+        if (!r) return '<tr><td>' + label + '</td><td><span class="pill muted">—</span></td></tr>';
+        const ok = r.conclusion === 'success';
+        const cls = ok ? 'up' : 'down';
+        return '<tr><td>' + label + '</td><td style="text-align:right"><span class="pill ' + cls + '">' + (ok ? '✅ ' : '⚠ ') + r.conclusion + '</span></td></tr>';
+      };
+      el.innerHTML = row('Tests (30)', j.runs.tests) + row('Health monitor', j.runs.monitor) + row('Predictive risk (ML)', j.runs.ml) + row('Security scan', j.runs.security);
+      const src = document.getElementById('security-src');
+      if (src) src.textContent = 'ℹ️ live from GitHub Actions — ' + j.sources.githubActions;
+    } catch {
+      el.innerHTML = '<tr><td colspan="2" class="muted">GitHub Actions not reachable from this browser sandbox — works when you run locally.</td></tr>';
+    }
   }
 
   function logEvents(d) {

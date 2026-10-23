@@ -3,7 +3,7 @@
 This is the complete, beginner-friendly guide to deploying **every** part of
 Aegis for free. Follow top-to-bottom. Copy-paste the commands.
 
-> ✅ = you have already done this (live).  ➕ = the next step to do.
+> ✅ = already live.  ➕ = next step.  (Verified 2026-09-18.)
 
 ---
 
@@ -11,161 +11,142 @@ Aegis for free. Follow top-to-bottom. Copy-paste the commands.
 
 **The health tracker must NOT live on the clouds it monitors.**
 
-If your monitor lived on Render and Render died, you would lose monitoring at
-exactly the moment you need it. That's why Aegis watches Render + Vercel from:
+If your monitor lived on Render and Render died, you'd lose monitoring at
+exactly the moment you need it. Aegis therefore watches Render + Vercel from
+three *independent* vantage points, all outside the fleet:
 
-1. a **Cloudflare Worker** (runs on Cloudflare's global edge) — ✅ live
-2. **GitHub Actions** (runs on GitHub's runners) — ✅ live
-3. an **Oracle Always-Free VM** (your own always-on server) — ➕ recommended
-
-Three vantage points, all outside the protected clouds → honest, independent
-evidence of which cloud is healthier.
+1. **Cloudflare Worker** (edge) — ✅ live
+2. **GitHub Actions** (runners) — ✅ live
+3. **Oracle Always-Free VM** (your own server) — ➕ recommended
 
 ---
 
 ## 1. Supabase (database) — ✅ DONE
 
-| Project URL | `https://kagjbxxmdyaypfcqemem.supabase.co` |
-|---|---|
+- Project: `https://kagjbxxmdyaypfcqemem.supabase.co`
+- Paste `infra/schema.sql` into **SQL Editor → Run**. (Safe to re-run.)
+- Creates 10 tables: health_checks, incidents, alerts, monitor_targets,
+  failover_events, audit_log, health_reports, api_keys, organizations, risk_flags.
 
-1. Log in at https://supabase.com → your project → **SQL Editor**.
-2. Open `infra/schema.sql`, copy the whole thing, paste it in, **Run**.
-   (It's safe to re-run — every table uses `if not exists`.)
-3. This creates: `health_checks`, `incidents`, `alerts`, `monitor_targets`,
-   `failover_events`, `audit_log`, `health_reports`, `api_keys`, `organizations`,
-   `risk_flags`.
-
-> 🔒 Only use the **publishable (anon)** key in code/CI. Never paste the
-> `service_role` key anywhere public.
+> 🔒 Only the **publishable (anon)** key goes in code. Never expose `service_role`.
 
 ---
 
-## 2. The protected app on each cloud
+## 2. Deploy YOUR OWN app on 3 clouds (how Aegis "runs applications")
 
-The same tiny app (`app/`) runs on every cloud so Aegis has something to protect.
-Each cloud simply runs it with a different `CLOUD_NAME`.
+Aegis protects **any** app that exposes a `/health` endpoint. The steps:
 
-### 2a. Render (cloud #1) — ✅ DONE
-`https://aegis-platform-pomf.onrender.com`
-- Render dashboard → New Web Service → connect the GitHub repo.
-- Build: `npm install` · Start: `node index.js` · Env: `CLOUD_NAME=render`.
-- Free tier note: the service **sleeps after ~15 min idle** — Aegis treats that
-  as a real failover event (cold start) and reroutes traffic. Good for demos.
+### Step A — make your app checkable
+```js
+// any framework — expose the identical contract on every cloud
+app.get('/health', (req, res) => res.json({
+  status: 'ok', cloud: process.env.CLOUD_NAME, requests, uptimeSeconds, timestamp: Date.now()
+}));
+```
+Aegis uses `status`, `cloud`, and the latency of the response. Nothing else.
 
-### 2b. Vercel (cloud #2) — ✅ DONE
-`https://aegis-platform-lyart.vercel.app`
-- Vercel uses `app/vercel.json` → the serverless wrapper `app/api/index.js`.
-- Env: `CLOUD_NAME=vercel`. No sleep-on-idle here.
+### Step B — deploy the SAME app three times (one per cloud)
 
-### 2c. Cloud Run (cloud #3) — optional / future
-- Free tier: 2,000,000 requests/month, then $0.40/million.
-- Deploy: `cd app && gcloud run deploy aegis-app --source . --region us-central1 --allow-unauthenticated --set-env-vars CLOUD_NAME=google-cloud-run`
-- (Or see `docs/ORACLE_VM_SETUP.md` to use an Oracle VM as cloud #3 + tracker.)
+**Render (cloud #1)** ✅ live:
+1. render.com → New Web Service → connect the GitHub repo
+2. Build `npm install`, Start `node index.js`, Env `CLOUD_NAME=render`
 
-After each deploy, check `https://…/health` returns `{"status":"ok",…}`.
+**Vercel (cloud #2)** ✅ live:
+1. vercel.com → Import → the repo → root `app/`
+2. Uses `app/vercel.json` (serverless). Env `CLOUD_NAME=vercel`
 
----
-
-## 3. Cloudflare Worker = router + edge monitor — ✅ DONE
-
-This is the failover router **and** a free 5-minute monitor.
-
+**Cloud Run (cloud #3)** ➕ when ready:
 ```bash
-cd orchestration/router
-npx wrangler login          # once — authorise in the browser
-npx wrangler secret put SUPABASE_URL    # → paste Supabase URL
-npx wrangler secret put SUPABASE_KEY    # → paste publishable key
-npx wrangler deploy
+gcloud run deploy aegis-app --source . --region us-central1 \
+  --allow-unauthenticated --set-env-vars CLOUD_NAME=google-cloud-run
 ```
 
-Result: `https://aegis-router.manav32478.workers.dev`
-
-- It proxies requests to the **healthiest** cloud.
-- Its cron (`*/5 * * * *`) writes `region='cloudflare-edge'` checks to Supabase.
-- `/router/health` shows the router's own view of the fleet.
-
-> If cron doesn't write to Supabase, the **secrets are missing** — run the two
-> `wrangler secret put` commands above again, then `wrangler deploy`.
+### Step C — register the clouds with the platform
+Add each URL to `monitor_targets` (or via **Admin → Add target** on the portal).
+The Worker + monitor then watch all of them automatically.
 
 ---
 
-## 4. GitHub Actions = CI + second monitor — ✅ DONE
+## 3. HOW TO PROVE FAILOVER (this is the examiner's favourite test)
 
-In the repo → **Settings → Secrets and variables → Actions**, add:
+**Method 1 — the dashboard button (30 seconds):**
+1. Open the dashboard → **"Failover proof"** card → note which cloud the
+   router serves (e.g. `render`).
+2. In Render dashboard: suspend/pause your service.
+3. Click **↻ Re-run proof** → the router now serves `vercel`.
 
-| Secret | Value |
+**Method 2 — plain URLs:**
+- `https://aegis-router.manav32478.workers.dev/health` → shows which cloud **serves**
+- `https://aegis-platform-pomf.onrender.com/health` → direct to Render
+- `https://aegis-platform-lyart.vercel.app/health` → direct to Vercel
+Kill one cloud → the router URL changes its answer within ~10 seconds.
+
+**Why you can trust the switch happened:** every probe, incident, alert and
+failover _decision_ is written to Supabase with a timestamp. Check
+`incidents` + `failover_events` tables — the story is recorded, not claimed.
+
+---
+
+## 4. HOW TO PROVE THE MONITOR IS ACTUALLY CHECKING
+
+Three independent pieces of evidence, all viewable live:
+
+| Evidence | Where |
 |---|---|
-| `SUPABASE_URL` | your Supabase URL |
-| `SUPABASE_KEY` | your **publishable** key |
-| `TARGETS` | JSON array of `{name,url,region}` |
-| `SELF_HEAL_TOKEN` | GitHub PAT with `workflow` scope (for self-healing) |
-| `SLACK_WEBHOOK_URL` | (optional) for alerts |
+| Timestamps advancing | Dashboard → "updated Xs ago" + probe strip |
+| Raw rows landing every 5 min | Supabase → `health_checks` (order by `checked_at`) |
+| Green workflow runs | GitHub → Actions → "Health monitor" (schedule */5) |
 
-Workflows included:
-- `monitor.yml` — runs the health monitor every 5 min (public repo = free).
-- `deploy.yml` — tests + security scan + deploy gate.
-- `ml-predict.yml` — Isolation Forest risk prediction daily.
-- `security-scan.yml` — Trivy + Checkov on demand.
-
-> If the repo is **private**, a `*/5` cron can burn GitHub's free 2,000
-> minutes/month fast. Keep the repo **public**, or rely on the Cloudflare cron.
+Also: run it by hand once and watch it write:
+```bash
+cd orchestration && node monitor.js
+# prints: render UP 397ms http=200 · vercel UP 388ms http=200 · saved 2 checks
+```
 
 ---
 
-## 5. Oracle Always-Free VM = 24/7 control plane — ➕ NEXT
+## 5. HOW TO PROVE THE INTELLIGENCE LAYER IS LIVE (not static)
 
-This is the "professional" upgrade: run web + api + monitor on a real, always-on
-Linux server, forever free (card needed once for identity; ₹0 charged).
+| Layer | Live source (now) |
+|---|---|
+| **Health scores** | recomputed from Supabase history every 10 s |
+| **ML z-scores** | rolling z-score recomputed every 10 s (e.g. render z=10 ⚠) |
+| **Isolation Forest** | daily GitHub Action → `risk_flags` table |
+| **Cost** | extrapolated from each cloud's **real** request counter (`/health` returns `requests`) |
+| **Carbon** | fallback grid averages; flips to live with ELECTRICITYMAP_KEY |
+| **Security CI** | dashboard "Security CI" card fetches GitHub Actions results live |
 
-**Full step-by-step: [`ORACLE_VM_SETUP.md`](ORACLE_VM_SETUP.md).** Short version:
+Value on the dashboard changes → it's computed, not hardcoded.
 
+---
+
+## 6. Oracle Always-Free VM (24/7 control plane) — ➕ NEXT
+
+Full steps: docs/ORACLE_VM_SETUP.md. Short version:
 ```bash
-ssh ubuntu@YOUR_VM_IP                     # after creating the VM in the OCI console
+ssh ubuntu@YOUR_VM_IP
 sudo apt update && sudo apt install -y git docker.io docker-compose-v2
 git clone https://github.com/Manav32478/aegis-platform-.git
-cd aegis-platform-
-cp .env.example .env && nano .env        # fill in Supabase + ADMIN_TOKEN
-sudo docker compose up -d --build
+cd aegis-platform- && cp .env.example .env && nano .env
+sudo docker compose up -d --build     # portal on :3100, monitor every 5 min
 ```
-
-Then the portal is live at `http://YOUR_VM_IP:3100` — dashboard, status, admin,
-API — plus a **third** monitor vantage point (`MONITOR_REGION=oracle-vm`).
 
 ---
 
-## 6. Local development
-
+## 7. Local development
 ```bash
-cd aegis-platform
-docker compose up --build        # one command, whole platform
-# or without Docker:
-cd web && npm install && ADMIN_TOKEN=admin node server.js
-cd api && npm install && node index.js
-cd orchestration && node monitor.js
-cd tests && npm install && npm test
+cd aegis-platform && ./start.sh          # whole platform, one command
+# or:
+docker compose up --build
 ```
 
 ---
 
-## 7. How to answer "which of the 3 clouds is healthier?"
-
-Open the **dashboard** (portal → Dashboard). It shows per cloud:
-- composite **health score** (0–100) + grade
-- uptime %, p50/p95 latency, error rate
-- anomaly flags + the **routing decision** ("traffic → X because highest score")
-
-The answer is computed from real Supabase history by
-`packages/common/analytics.js` + `intelligence/failover.js`.
-
----
-
-## 8. What could go wrong (and the fix)
-
+## 8. Troubleshooting
 | Symptom | Fix |
 |---|---|
-| Dashboard shows "no data" | Run `node orchestration/monitor.js` once; check Supabase has `health_checks` rows |
-| Cloudflare cron not writing | Secrets missing → `wrangler secret put SUPABASE_URL/KEY`, redeploy |
-| `[object Object]` latency on old dashboard | Old build cached — redeploy Render/Vercel, or use the new portal |
-| Render "DOWN" in the morning | Render free tier sleeps — that's a *real* failover demo, not a bug |
-| API returns 401/403 | Generate a key (`node api/generate-key.js`) or set `ALLOWED_KEYS=abc node index.js` |
-| `column region does not exist` | You haven't applied `infra/schema.sql` v2 yet — run it in SQL Editor |
+| Dashboard "no data" | `cd orchestration && node monitor.js` once |
+| Router answers slowly after a pause | free-tier cold start — wait ~15 s, re-probe |
+| Probe URL shows `/health/health` | fixed in v2 — pull latest `web/data.js` |
+| CI shows Node 20 deprecation warning | harmless — runs still pass |
+| Render strona down in mornings | it sleeps when idle — that IS a failover event |

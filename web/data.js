@@ -17,27 +17,37 @@
 const { analyzeHistory } = require('../orchestration/monitor');
 const { getHealthChecks, sb } = require('../packages/common/supabase');
 const { getTargets, DEFAULT_TARGETS, MONITOR_REGION } = require('../packages/common/config');
-const { detectAnomalies } = require('../intelligence/anomaly');
-const { estimateAegisSavings, forecastAnnual, FREE_TIER_LIMITS } = require('../intelligence/cost');
+const { detectAnomalies, analyzeSeries } = require('../intelligence/anomaly');
+const { estimateAegisSavings, estimateCloudRunOverage, forecastAnnual, FREE_TIER_LIMITS } = require('../intelligence/cost');
 const { rankRegions } = require('../intelligence/carbon');
 const { decideRoute } = require('../intelligence/failover');
 const { slaStatus, trendLatency, seriesOf } = require('../packages/common/analytics');
 
 // ---- live probe of one vector cloud ---------------------------------------
+/** Append /health only when the URL doesn't already end with it. */
+function healthUrl(url) {
+  return /\/health\/?$/i.test(url) ? url.replace(/\/+$/, '') : url.replace(/\/+$/, '') + '/health';
+}
+
 async function probe(t) {
   const start = Date.now();
+  const target = healthUrl(t.url);
   try {
-    const res = await fetch(t.url + '/health', { signal: AbortSignal.timeout(4000) });
+    const res = await fetch(target, { signal: AbortSignal.timeout(4000) });
     const healthy = res.ok && res.status < 500;
-    return { name: t.name, healthy, latency: healthy ? Date.now() - start : null, status: res.status, url: t.url, enabled: t.enabled };
+    let info = {};
+    if (healthy) {
+      try { info = await res.json(); } catch { /* not JSON — ignore */ }
+    }
+    return {
+      name: t.name, healthy, latency: healthy ? Date.now() - start : null,
+      status: res.status, url: target, enabled: t.enabled,
+      requests: info.requests, uptimeSeconds: info.uptimeSeconds, cloud: info.cloud,
+    };
   } catch {
     return {
-      name: t.name,
-      healthy: false,
-      latency: null,
-      status: 0,
-      url: t.url,
-      enabled: t.enabled,
+      name: t.name, healthy: false, latency: null, status: 0, url: target,
+      enabled: t.enabled, requests: null, uptimeSeconds: null,
       reason: t.enabled === false ? 'not deployed (disabled)' : 'probe failed',
     };
   }
@@ -61,8 +71,9 @@ async function provideSnapshot() {
   const filtered = rows.filter((r) => r.cloud_name !== 'test-probe');
   const analytics = analyzeHistory(filtered);
 
-  // per-cloud extras: anomaly, SLA, trend, sparkline series
+  // per-cloud extras: anomaly, SLA, trend, sparkline series, ML z-scores
   const riskMap = {};
+  const mlScores = {};
   const series = {};
   for (const [name, a] of Object.entries(analytics)) {
     const asc = filtered.filter((r) => r.cloud_name === name).sort(
@@ -70,14 +81,46 @@ async function provideSnapshot() {
     );
     const lats = asc.map((r) => r.latency);
     riskMap[name] = detectAnomalies(lats);
+    mlScores[name] = analyzeSeries(lats); // live rolling z-score (ML, computed now)
     a.sla = slaStatus(a.uptimePct);
     a.trend = trendLatency(asc);
-    if (a.sla) analytics[name] = { ...a, sla: a.sla, trend: a.trend };
+    analytics[name] = { ...a, sla: a.sla, trend: a.trend };
     series[name] = seriesOf(asc, 200);
   }
 
   // live vector probes — the "real-time" heartbeat
   const probes = await probeAll();
+
+  // ---- FAILOVER PROOF: ask the router itself which cloud is serving now ----
+  let router = null;
+  try {
+    const res = await fetch('https://aegis-router.manav32478.workers.dev/health', {
+      signal: AbortSignal.timeout(6000),
+    });
+    if (res.ok) {
+      const j = await res.json();
+      router = {
+        serving: j.cloud || 'unknown',
+        uptimeSeconds: j.uptimeSeconds,
+        requests: j.requests,
+        timestamp: j.timestamp,
+        checkedAt: new Date().toISOString(),
+      };
+    }
+  } catch {
+    router = null; // offline — tolerated
+  }
+
+  // ---- trace how long the router has been serving the current cloud ----
+  // (an open incident on the OTHER cloud = proof of a live failover) ------
+  const openIncidents = await sb('/rest/v1/incidents?select=*&ended_at=is.null&order=id.asc').catch(() => []);
+  const proxy = {
+    currentCloud: router ? router.serving : null,
+    routerAlive: !!router,
+    // if cloud X has an open (running) incident, the router must be serving Y
+    failoverActive: Array.isArray(openIncidents) && openIncidents.length > 0,
+    failedClouds: Array.isArray(openIncidents) ? openIncidents.map((i) => i.cloud_name) : [],
+  };
 
   const [incidents, alerts, riskFlags, failover, reports] = await Promise.all([
     sb('/rest/v1/incidents?select=*&order=id.desc&limit=50').catch(() => []),
@@ -87,8 +130,17 @@ async function provideSnapshot() {
     sb('/rest/v1/health_reports?select=*&order=id.desc&limit=10').catch(() => []),
   ]);
 
-  // open incidents (currently down) — the live state
-  const openIncidents = await sb('/rest/v1/incidents?select=*&ended_at=is.null&order=id.asc').catch(() => []);
+  // ---- LIVE COST: extrapolate from each cloud's real request counter ----
+  let monthlyRequests = 1000000;
+  const liveCounters = probes
+    .filter((p) => p.requests != null && p.uptimeSeconds > 60)
+    .map((p) => ({ cloud: p.name, requests: p.requests, perHour: (p.requests / p.uptimeSeconds) * 3600 }));
+  if (liveCounters.length) {
+    const totalPerHour = liveCounters.reduce((s, x) => s + x.perHour, 0);
+    monthlyRequests = Math.round(totalPerHour * 24 * 30);
+  }
+  const cost = estimateAegisSavings(monthlyRequests);
+  const cloudRun = estimateCloudRunOverage(monthlyRequests);
 
   const carbon = await rankRegions([
     { name: 'oregon', zone: 'us-west1' },
@@ -110,15 +162,17 @@ async function provideSnapshot() {
   }
 
   const route = decideRoute(analytics, carbonByName);
-  const cost = estimateAegisSavings(1000000);
 
   return {
     generatedAt: new Date().toISOString(),
     vantage: MONITOR_REGION,
     analytics,
     riskMap,
+    mlScores,
     series,
     probes,
+    router,
+    proxy,
     incidents,
     openIncidents,
     alerts,
@@ -128,7 +182,10 @@ async function provideSnapshot() {
     carbon,
     route,
     cost,
-    forecast: forecastAnnual(1000000, 10, 12),
+    liveCounters,
+    monthlyRequests,
+    cloudRunOverage: cloudRun,
+    forecast: forecastAnnual(monthlyRequests, 10, 12),
     freeTierLimits: FREE_TIER_LIMITS,
     totalChecks: filtered.length,
     slaTarget: 99.9,

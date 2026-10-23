@@ -35,8 +35,7 @@ async function withLimit(items, limit, fn) {
   await Promise.all(workers);
 }
 
-/** Probe one target. Returns {name, region, healthy, latency, httpStatus, timestamp}. */
-async function checkTarget(t) {
+/** Probe one target. Returns {name, region, healthy, latency, httpStatus, timestamp}. */async function checkTarget(t) {
   const start = Date.now();
   try {
     const res = await fetch(t.url, { signal: AbortSignal.timeout(5000) });
@@ -249,8 +248,21 @@ async function saveResults(results) {
 
 // ---- main -----------------------------------------------------------------
 
+/** Resolve targets: DB (admin-managed) → env TARGETS → defaults. */
+async function resolveTargets() {
+  try {
+    const rows = await sb('/rest/v1/monitor_targets?select=*&enabled=eq.true&order=id.asc');
+    if (Array.isArray(rows) && rows.length) {
+      return rows.map((r) => ({ name: r.cloud_name, url: r.url, region: r.region }));
+    }
+  } catch {
+    /* table missing / offline → fall back */
+  }
+  return getTargets();
+}
+
 async function main() {
-  const targets = getTargets();
+  const targets = await resolveTargets();
   const results = [];
   await withLimit(targets, CONCURRENCY, async (t) => {
     results.push(await checkTarget(t));
@@ -297,5 +309,6 @@ module.exports = {
   maintainIncidents,
   deliverAlerts,
   maybeSelfHeal,
+  resolveTargets,
   main,
 };

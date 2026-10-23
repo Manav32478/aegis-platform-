@@ -12,9 +12,11 @@ echo " Aegis v2 — starting the whole platform..."
 echo "============================================"
 
 # 1. Web portal (landing + dashboard + status + admin)
+# Admin page uses ADMIN_TOKEN — set a strong value in production; the default
+# below keeps the local demo working out of the box.
 if [ -d web ]; then
-  (cd web && [ -d node_modules ] || npm install --silent; node server.js) &
-  echo "  • Portal       → http://localhost:3100"
+  (cd web && [ -d node_modules ] || npm install --silent; ADMIN_TOKEN=${ADMIN_TOKEN:-aegis-demo} node server.js) &
+  echo "  • Portal       → http://localhost:3100   (admin token: ${ADMIN_TOKEN:-aegis-demo})"
 fi
 
 # 2. Multi-tenant API + Swagger

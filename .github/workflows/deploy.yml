@@ -1,6 +1,17 @@
-# Deploy pipeline — Month 2.7
-# GCP deploys automatically on push to main. Oracle is manual (SSH) — an example is
-# included but disabled. Render auto-deploys from GitHub once you connect the repo.
+# Deploy pipeline — v2.1
+#
+# On every push to main:
+#   1. test        → 30 unit tests
+#   2. security    → Trivy (container/fs) + Checkov (IaC)
+#   3. render      → trigger Render deploy hook (secret: RENDER_DEPLOY_HOOK)
+#   4. vercel      → trigger Vercel deploy hook (secret: VERCEL_DEPLOY_HOOK)
+#   5. gcp         → gcloud run deploy (auto-skips until GCP_SA_KEY exists)
+#   6. oracle      → SSH deploy (disabled until you have a VM — see docs)
+#
+# Render/Vercel deploy hooks are created in each dashboard (Settings → Deploy Hook)
+# and added to this repo under Settings → Secrets and variables → Actions.
+# They redeploy automatically WITHOUT a paid CI machine — stays ₹0.
+
 name: Deploy to all clouds
 on:
   push:
@@ -34,6 +45,27 @@ jobs:
         with:
           directory: infra/
 
+  deploy-render:
+    needs: [test, security-scan]
+    # skips silently until the deploy-hook secret exists
+    if: ${{ secrets.RENDER_DEPLOY_HOOK != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy
+        run: |
+          curl -s -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}" \
+            -o /dev/null -w "render deploy hook → HTTP %{http_code}\n"
+
+  deploy-vercel:
+    needs: [test, security-scan]
+    if: ${{ secrets.VERCEL_DEPLOY_HOOK != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel deploy
+        run: |
+          curl -s -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}" \
+            -o /dev/null -w "vercel deploy hook → HTTP %{http_code}\n"
+
   deploy-gcp:
     needs: [test, security-scan]
     # Auto-skips until you add the GCP_SA_KEY secret (keeps the Actions tab green).
@@ -57,7 +89,7 @@ jobs:
   # Oracle deploy example — enable when you have a VM + SSH key secret.
   deploy-oracle:
     needs: [test, security-scan]
-    if: false   # set to true once GCP_ORACLE_SSH_KEY secret exists
+    if: false   # set to true once ORACLE_VM_IP + ORACLE_SSH_KEY exist
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

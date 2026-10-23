@@ -182,6 +182,8 @@ drop policy if exists "anon update incidents" on incidents;
 create policy "anon update incidents" on incidents for update using (true);
 drop policy if exists "anon read incidents" on incidents;
 create policy "anon read incidents" on incidents for select using (true);
+drop policy if exists "anon delete incidents" on incidents;
+create policy "anon delete incidents" on incidents for delete using (true);
 
 -- alerts
 alter table alerts enable row level security;
@@ -189,6 +191,8 @@ drop policy if exists "anon insert alerts" on alerts;
 create policy "anon insert alerts" on alerts for insert with check (true);
 drop policy if exists "anon read alerts" on alerts;
 create policy "anon read alerts" on alerts for select using (true);
+drop policy if exists "anon delete alerts" on alerts;
+create policy "anon delete alerts" on alerts for delete using (true);
 
 -- monitor_targets
 alter table monitor_targets enable row level security;
@@ -207,6 +211,8 @@ drop policy if exists "anon insert failover" on failover_events;
 create policy "anon insert failover" on failover_events for insert with check (true);
 drop policy if exists "anon read failover" on failover_events;
 create policy "anon read failover" on failover_events for select using (true);
+drop policy if exists "anon delete failover" on failover_events;
+create policy "anon delete failover" on failover_events for delete using (true);
 
 -- audit_log
 alter table audit_log enable row level security;
@@ -214,6 +220,8 @@ drop policy if exists "anon insert audit" on audit_log;
 create policy "anon insert audit" on audit_log for insert with check (true);
 drop policy if exists "anon read audit" on audit_log;
 create policy "anon read audit" on audit_log for select using (true);
+drop policy if exists "anon delete audit" on audit_log;
+create policy "anon delete audit" on audit_log for delete using (true);
 
 -- health_reports
 alter table health_reports enable row level security;
@@ -221,6 +229,8 @@ drop policy if exists "anon insert reports" on health_reports;
 create policy "anon insert reports" on health_reports for insert with check (true);
 drop policy if exists "anon read reports" on health_reports;
 create policy "anon read reports" on health_reports for select using (true);
+drop policy if exists "anon delete reports" on health_reports;
+create policy "anon delete reports" on health_reports for delete using (true);
 
 -- ----------------------------------------------------------------------------
 -- Seed the two live clouds so the monitor_targets table is never empty.

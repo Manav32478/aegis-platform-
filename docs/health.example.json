@@ -1,0 +1,5 @@
+{
+  "status": "ok",
+  "service": "sparsh-store",
+  "note": "This static file is what Aegis probes every 5 minutes to check this cloud is alive."
+}
