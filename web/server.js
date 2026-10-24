@@ -82,6 +82,22 @@ app.get('/api/live', async (req, res) => {
   }
 });
 
+// Safe operational diagnostics: reports statuses/counts, never secret values.
+app.get('/api/diagnostics', async (req, res) => {
+  try {
+    const snapshot = await provideSnapshot();
+    res.json({
+      checkedAt: snapshot.generatedAt,
+      diagnostics: snapshot.diagnostics,
+      probes: (snapshot.probes || []).map(({ name, enabled, healthy, status, url, reason }) =>
+        ({ name, enabled, healthy, status, url, reason })),
+      router: snapshot.router ? { serving: snapshot.router.serving, requests: snapshot.router.requests } : null,
+    });
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
 // ---- uptime badge -----------------------------------------------------------
 function badgeSvg(label, status, color, pct, extra) {
   const L = label.length * 6.5 + 11;

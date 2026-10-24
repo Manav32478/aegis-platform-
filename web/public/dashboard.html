@@ -24,6 +24,7 @@
 
   <!-- KPI strip -->
   <div class="kpi-strip" id="kpi-strip"></div>
+  <div id="diagnostics-banner" class="card hidden" style="margin-top:14px;border-left:4px solid var(--amber)"></div>
 
   <div class="section-head" style="margin-top:22px">
     <div>
@@ -576,9 +577,21 @@
   }
 
   function render(d) {
-    document.getElementById('vantage').textContent = d.vantage;
+    document.getElementById('vantage').textContent = d.vantage || 'unknown';
     document.getElementById('updated').textContent = Aegis.fmtAgo(d.generatedAt);
     document.getElementById('stream-state').textContent = 'streaming';
+    const diag = document.getElementById('diagnostics-banner');
+    const warnings = d.diagnostics && Array.isArray(d.diagnostics.warnings) ? d.diagnostics.warnings : [];
+    if (diag && warnings.length) {
+      diag.classList.remove('hidden');
+      diag.textContent = 'Data connection needs attention: ' + warnings.join(' · ');
+    } else if (diag && !(d.totalChecks > 0)) {
+      diag.classList.remove('hidden');
+      diag.textContent = 'No health history rows were returned. Verify this deployment’s SUPABASE_URL / SUPABASE_KEY and the health_checks SELECT policy, then run the monitor.';
+    } else if (diag) {
+      diag.classList.add('hidden');
+      diag.textContent = '';
+    }
     renderKpis(d);
     renderProbes(d);
     renderCloudCards(d);
