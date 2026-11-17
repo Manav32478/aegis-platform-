@@ -2,8 +2,22 @@
 // Every microservice (monitor, api, web) requires this so there is ONE source
 // of truth for targets, regions and defaults.
 
-const SUPABASE_URL =
-  process.env.SUPABASE_URL || 'https://kagjbxxmdyaypfcqemem.supabase.co';
+const DEFAULT_SUPABASE_URL = 'https://kagjbxxmdyaypfcqemem.supabase.co';
+
+/**
+ * Normalize either a Supabase Project URL or a copied REST API base URL to the
+ * project root. The REST helper appends /rest/v1 itself. This avoids the
+ * common Vercel setting mistake of storing ...supabase.co/rest/v1 and then
+ * requesting .../rest/v1/rest/v1/... (PostgREST PGRST125).
+ */
+function normalizeSupabaseUrl(value) {
+  return String(value || DEFAULT_SUPABASE_URL)
+    .trim()
+    .replace(/\/(?:rest\/v1|auth\/v1|storage\/v1)\/?$/i, '')
+    .replace(/\/+$/, '');
+}
+
+const SUPABASE_URL = normalizeSupabaseUrl(process.env.SUPABASE_URL);
 
 // Publishable (anon) key — safe to ship in client code by design.
 const SUPABASE_KEY = process.env.SUPABASE_KEY ||
@@ -14,7 +28,7 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY ||
 // (via env TARGETS, or the admin page).
 const DEFAULT_TARGETS = [
   { name: 'render',           url: 'https://aegis-platform-pomf.onrender.com/health', region: 'oregon',      enabled: true  },
-  { name: 'vercel',           url: 'https://aegis-platform-lyart.vercel.app/health',  region: 'global edge', enabled: true  },
+  { name: 'vercel',           url: 'https://aegis-platform-qrhr.vercel.app/health',  region: 'global edge', enabled: true  },
   { name: 'google-cloud-run', url: 'https://aegis-app-gcp.a.run.app/health',          region: 'us-central1', enabled: false },
   { name: 'oracle-cloud',     url: 'http://YOUR_ORACLE_VM_IP/health',                 region: 'ap-mumbai-1', enabled: false },
 ];
@@ -46,6 +60,7 @@ function getTargets() {
 
 module.exports = {
   SUPABASE_URL,
+  normalizeSupabaseUrl,
   SUPABASE_KEY,
   DEFAULT_TARGETS,
   MONITOR_REGION,

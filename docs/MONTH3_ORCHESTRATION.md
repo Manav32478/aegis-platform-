@@ -11,7 +11,7 @@ You've completed Month 1–2. Month 3 is the **orchestration** that makes Aegis 
   history from Supabase and draws the latency chart in the browser. After you redeploy,
   both of these work:
   - `https://aegis-platform-pomf.onrender.com/status`
-  - `https://aegis-platform-lyart.vercel.app/status`
+  - `https://aegis-platform-qrhr.vercel.app/status`
 - **Self-healing** (`monitor.js` `maybeSelfHeal`) — auto-redeploys a cloud that fails
   3 checks in a row (needs a GitHub PAT — optional, Month 3.5).
 

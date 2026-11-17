@@ -8,7 +8,7 @@
 
 ```bash
 cd ~/Desktop/aegis-platform
-./start.sh
+bash start.sh
 ```
 
 Boots **everything**:
@@ -71,7 +71,7 @@ streams, it silently falls back to 10s polling (same result).
 ## Run just the tests
 
 ```bash
-cd tests && npm install && npm test     # 30 tests, all passing
+cd tests && npm ci && npm test -- --runInBand     # 37 tests, 10 suites
 ```
 
 ## Run one monitor cycle manually

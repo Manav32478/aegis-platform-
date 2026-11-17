@@ -16,7 +16,7 @@ who built the current platform.
 - Multi-tenant API (key auth, rate limiting, audit log, Swagger)
 - Professional portal (landing, dashboard, public status, admin)
 - Security scans in CI (Trivy, Checkov, OPA/Rego)
-- 26 unit tests + provisioning docs + Oracle VM guide
+- 37 unit tests across 10 suites + provisioning docs + Oracle VM guide
 
 ---
 

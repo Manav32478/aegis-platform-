@@ -4,7 +4,7 @@
 | Cloud | URL | Status |
 |-------|-----|--------|
 | Render (free) | https://aegis-platform-pomf.onrender.com | ✅ `/health` returns `{"cloud":"render"}` |
-| Vercel (free) | https://aegis-platform-lyart.vercel.app | ✅ `/health` returns `{"cloud":"vercel"}` |
+| Vercel (free) | https://aegis-platform-qrhr.vercel.app | ✅ `/health` returns `{"cloud":"vercel"}` |
 | Supabase | https://kagjbxxmdyaypfcqemem.supabase.co | ✅ 4 tables created |
 
 Your health monitor already polls both live clouds and reports them healthy.
@@ -31,7 +31,7 @@ Go to your repo → **Settings → Secrets and variables → Actions → New rep
 |-------------|-------|
 | `SUPABASE_URL` | `https://kagjbxxmdyaypfcqemem.supabase.co` |
 | `SUPABASE_KEY` | `sb_publishable_cwauqX8Hq9ORgefEDU38cA_H4I-4qti` |
-| `TARGETS` | `[{"name":"render","url":"https://aegis-platform-pomf.onrender.com/health"},{"name":"vercel","url":"https://aegis-platform-lyart.vercel.app/health"}]` |
+| `TARGETS` | `[{"name":"render","url":"https://aegis-platform-pomf.onrender.com/health"},{"name":"vercel","url":"https://aegis-platform-qrhr.vercel.app/health"}]` |
 
 ## STEP 4 — Watch CI run
 Go to repo → **Actions** tab → you'll see the **"Deploy to all clouds"** and **"Security scan"**

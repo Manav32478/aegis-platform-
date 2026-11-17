@@ -47,7 +47,26 @@
     const el = document.getElementById('status-cards');
     const names = Object.keys(d.analytics || {});
     if (!names.length) {
-      el.innerHTML = '<div class="card"><h3>No data yet</h3><p class="muted">The monitor has not recorded any checks.</p></div>';
+      const probes = (d.probes || []).filter(p => p.enabled !== false);
+      if (probes.length) {
+        el.innerHTML = probes.map(p =>
+          '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center">' +
+          '<h3><span class="dot ' + (p.healthy ? 'up' : 'down') + '"></span>' + (p.name || 'unnamed origin') + '</h3>' +
+          '<span class="pill ' + (p.healthy ? 'up' : 'down') + '">' + (p.healthy ? 'Operational' : 'Unavailable') + '</span></div>' +
+          '<div class="stat" style="margin:10px 0 2px"><span class="value" style="font-size:22px">' + (p.latency != null ? p.latency + ' ms' : '—') + '</span><span class="label">live probe latency</span></div>' +
+          '<p class="muted small">Live status only — stored uptime history is not available.</p></div>'
+        ).join('');
+        const details = (d.diagnostics && d.diagnostics.warnings || []).join(' · ');
+        if (details) {
+          const note = document.createElement('div');
+          note.className = 'card muted small';
+          note.style.gridColumn = '1 / -1';
+          note.textContent = 'History diagnostics: ' + details;
+          el.appendChild(note);
+        }
+      } else {
+        el.innerHTML = '<div class="card"><h3>No monitoring data yet</h3><p class="muted">No stored checks or live probes are available.</p></div>';
+      }
     } else {
       el.innerHTML = names.map(n => {
         const a = d.analytics[n];

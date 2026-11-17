@@ -1,88 +1,55 @@
-# Aegis — Project Status (v2.1)
+# Aegis — Current Project Status
 
-> Updated 2026-09-17 · This file is a single-page "where are we?" for evaluations.
+> Audited 2026-11-12. This document records observed deployment state; recheck
+> live URLs and workflow runs before a presentation.
 
-## Live right now ✅
+## Live verification
 
-| Component | Technology | URL / where |
-|---|---|---|
-| Cloud #1 (protected app) | Node + Express on Render (free) | https://aegis-platform-pomf.onrender.com |
-| Cloud #2 (protected app) | Node + Express on Vercel (Hobby) | https://aegis-platform-lyart.vercel.app |
-| Failover router + edge monitor | Cloudflare Worker (cron */5) | https://aegis-router.manav32478.workers.dev |
-| Database | Supabase Postgres (free) | 10 tables, incl. incidents/alerts/audit |
-| Second monitor | GitHub Actions cron */5 | repo → Actions → "Health monitor" |
-| ML risk prediction | Python Isolation Forest (daily CI) | repo → Actions → "Predictive risk (ML)" |
-| CI/CD | GitHub Actions (test → scan → deploy) | .github/workflows |
+| Component | Current observation |
+|---|---|
+| Render protected app | `/health` returns HTTP 200 |
+| Cloudflare Worker | Deployed; router `/health` currently proxies Render |
+| Vercel control-plane portal | `https://aegis-platform-iota.vercel.app` loads; `/health` identifies `aegis-web` |
+| Supabase database | Direct API returns health history and monitor targets |
+| Vercel portal → Supabase | `/api/diagnostics` reports `PGRST125 Invalid path specified`; correct the Vercel `SUPABASE_URL` and redeploy |
+| Vercel protected app origin | ✅ `aegis-platform-qrhr.vercel.app/health` returns HTTP 200; Supabase target updated. Worker source must be redeployed with this origin. |
+| Cloudflare cron → Supabase | No `cloudflare-edge` rows observed; configure Worker secrets and verify a scheduled write |
+| GitHub Actions | Recent Health monitor runs succeeded; most recent deploy/security status has failures that need review |
+| Local tests | 37 tests / 10 suites pass in the workspace |
 
-## v2.1 — the real-time upgrade
+## Code fixes in the current package
 
-- **Server-Sent Events** (`/api/stream`): the dashboard updates itself every
-  10 s as the monitor/prober runs — no refresh, no client polling.
-- **Live on-demand probes**: the platform itself hits every cloud's `/health`
-  every 10 s and shows the result + latency in a pulse panel.
-- **Live event feed**: a terminal-style log of probes, routing decisions and
-  incident changes.
-- **SLA tracking**: each cloud's uptime vs a 99.9% target with Met/Near/At-risk.
-- **Latency trend**: 24h delta per cloud (rising ▲ / falling ▼).
-- **Sparklines**: per-cloud latency history drawn in the cards.
-- **Embeddable uptime badges**: `/badge/{cloud}.svg` for the GitHub README.
-- **CSV/JSON export**: `/api/export.csv`, `/api/export.json`.
-- **Dark/light theme toggle** on every page.
-- Test suite grew to **30 tests / 7 suites**.
+- Supabase base URL normalization strips a mistakenly copied `/rest/v1` suffix.
+- Dashboard probes normalize both Supabase target rows (`cloud_name`) and defaults (`name`) so labels aren’t undefined.
+- Disabled origins are skipped; active probe failures display their status/reason.
+- Dashboard displays Supabase/target diagnostics; `/api/diagnostics` returns safe status/count information without secrets.
+- Deploy workflow no longer puts GitHub secrets directly in job-level `if` expressions.
 
-## Live routing decision (verified 2026-09-17)
+## Remaining production-pilot tasks
 
-`vercel` (health score 93, 100% uptime) → `render` (score 85, ~98% uptime).
-The anomaly detector has flagged Render's cold-start latency spikes in
-history — stable clouds are scored Excellent, degrading ones drop to Good/At-risk.
+1. Push this package from a Git clone and wait for the Vercel portal deployment.
+2. In Vercel `aegis-platform-iota`, set `SUPABASE_URL` to the project root
+   `https://kagjbxxmdyaypfcqemem.supabase.co` (no `/rest/v1`) and `SUPABASE_KEY`
+   to the publishable/anon key; redeploy.
+3. Confirm `/api/diagnostics` returns a positive `historyRows` count and
+   `targetSource: supabase.monitor_targets`.
+4. Deploy a protected app copy to Vercel from root directory `app/`, with
+   `CLOUD_NAME=vercel`; verify its `/health` JSON.
+5. Update Supabase `monitor_targets` and Cloudflare Worker `TARGETS` to the new
+   Vercel app URL; redeploy the Worker.
+6. Add Worker secrets `SUPABASE_URL` and `SUPABASE_KEY`; verify a scheduled
+   `cloudflare-edge` check appears in Supabase.
+7. Run a controlled staging failover and document the actual result before
+   presenting two-origin failover as verified.
 
-## New in v2 (what this "professional rebuild" added)
+## Claims to avoid until verified
 
-- **Control-plane portal** in `web/`: landing page + live dashboard + public
-  status page + admin console (targets, keys, audit, reports).
-- **Health scoring** per cloud (0–100 composite of uptime + latency + error rate)
-  with percentiles p50/p90/p95/p99.
-- **Incidents** (open/close with downtime duration) + **alerting** (Slack /
-  webhook / email).
-- **Report generator** with daily/weekly snapshots stored in Supabase.
-- **API v2**: rate limiting per key, audit log, cost forecast endpoint, Swagger.
-- **Anomaly detection** running live in the monitor (rolling-statistics) in
-  addition to the CI Isolation Forest.
-- **Deployment playbooks**: `docs/DEPLOYMENT.md`, `docs/ORACLE_VM_SETUP.md`.
-- **Docker Compose** — whole platform in one command.
-- **26 unit tests** (was 6).
-
-## Verified during the rebuild
-
-- Portal `/api/aggregate` returns real Supabase data: ~850 checks, 2 clouds.
-- Live routing decision: `vercel` (score 93) over `render` (score 85).
-- Live anomaly flag: render's cold-start latency spikes detected.
-- API auth: 401 without key, 200 with key; forecast endpoint returns 12-mo rows.
-- 26/26 tests passing.
-
-## Not yet done (honest — say this in the viva)
-
-1. **Apply `infra/schema.sql` v2** in the Supabase SQL Editor (adds the new
-   tables + `region`/`http_status` columns + delete policy). The platform
-   already works without it via graceful fallbacks, but v2 columns unlock the
-   full multi-region + incidents + alerts story.
-2. **Cloud #3** (Cloud Run or Oracle VM) — guides ready, not yet deployed.
-3. **Alert delivery** — wired in code; add a Slack webhook / Resend key in
-   secrets to see real outbound alerts.
-4. **Production hardening** — move writes behind a Supabase Edge Function with
-   `service_role` (documented in docs/free-tier-notes.md); demo mode uses anon
-   key + RLS for the project scope.
-
-## Next 3 concrete steps
-
-```bash
-# 1. Apply the new schema (paste into Supabase SQL Editor, then Run)
-open infra/schema.sql
-
-# 2. Re-run the test suite
-cd tests && npm install && npm test
-
-# 3. Run the whole platform locally
-#    Option A: docker compose up --build
-#    Option B: ./start.sh
-```
+- Do not say three app origins are active: Render responds; the configured
+  Vercel app target is stale; Cloud Run and Oracle are disabled/planned.
+- Do not say the Worker selects the highest dashboard score: it currently tries
+  healthy origins in configured order.
+- Do not guarantee automatic redeployment or zero downtime: redeploy depends on
+  tokens/hooks and no production SLA has been established.
+- Do not promise unconditional ₹0 operation: free-tier limits and overages vary.
+- Do not describe the demo API as production tenant-isolated: RLS and
+  in-memory rate limiting need hardening before customer data is used.

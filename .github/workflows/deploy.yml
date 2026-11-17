@@ -1,18 +1,5 @@
-# Deploy pipeline — v2.1
-#
-# On every push to main:
-#   1. test        → 30 unit tests
-#   2. security    → Trivy (container/fs) + Checkov (IaC)
-#   3. render      → trigger Render deploy hook (secret: RENDER_DEPLOY_HOOK)
-#   4. vercel      → trigger Vercel deploy hook (secret: VERCEL_DEPLOY_HOOK)
-#   5. gcp         → gcloud run deploy (auto-skips until GCP_SA_KEY exists)
-#   6. oracle      → SSH deploy (disabled until you have a VM — see docs)
-#
-# Render/Vercel deploy hooks are created in each dashboard (Settings → Deploy Hook)
-# and added to this repo under Settings → Secrets and variables → Actions.
-# They redeploy automatically WITHOUT a paid CI machine — stays ₹0.
-
 name: Deploy to all clouds
+
 on:
   push:
     branches: [main]
@@ -26,58 +13,85 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+      - run: npm ci
         working-directory: tests
-      - run: npm test
+      - run: npm test -- --runInBand
         working-directory: tests
 
   security-scan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Trivy — container/app scan
+      - name: Trivy filesystem scan
         uses: aquasecurity/trivy-action@0.24.0
         with:
           scan-type: fs
-          scan-ref: app/
-      - name: Checkov — IaC scan
+          scan-ref: .
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+      - name: Checkov IaC scan
         uses: bridgecrewio/checkov-action@v12
         with:
           directory: infra/
+          output_format: cli
+          soft_fail: false
 
   deploy-render:
     needs: [test, security-scan]
-    # skips silently until the deploy-hook secret exists
-    if: ${{ secrets.RENDER_DEPLOY_HOOK != '' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Render deploy
+      - name: Trigger Render deploy hook if configured
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
         run: |
-          curl -s -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}" \
-            -o /dev/null -w "render deploy hook → HTTP %{http_code}\n"
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "RENDER_DEPLOY_HOOK is not configured; skipping Render deploy."
+            exit 0
+          fi
+          curl --fail --silent --show-error -X POST "$DEPLOY_HOOK"
 
   deploy-vercel:
     needs: [test, security-scan]
-    if: ${{ secrets.VERCEL_DEPLOY_HOOK != '' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Vercel deploy
+      - name: Trigger Vercel deploy hook if configured
+        env:
+          DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
         run: |
-          curl -s -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}" \
-            -o /dev/null -w "vercel deploy hook → HTTP %{http_code}\n"
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "VERCEL_DEPLOY_HOOK is not configured; skipping Vercel deploy."
+            exit 0
+          fi
+          curl --fail --silent --show-error -X POST "$DEPLOY_HOOK"
 
   deploy-gcp:
     needs: [test, security-scan]
-    # Auto-skips until you add the GCP_SA_KEY secret (keeps the Actions tab green).
-    if: ${{ secrets.GCP_SA_KEY != '' }}
     runs-on: ubuntu-latest
     steps:
+      - id: gate
+        name: Check whether GCP credentials are configured
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          if [ -n "$GCP_SA_KEY" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "GCP_SA_KEY is not configured; skipping Cloud Run deploy."
+          fi
       - uses: actions/checkout@v4
+        if: steps.gate.outputs.configured == 'true'
       - uses: google-github-actions/auth@v2
+        if: steps.gate.outputs.configured == 'true'
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
       - uses: google-github-actions/setup-gcloud@v2
+        if: steps.gate.outputs.configured == 'true'
       - name: Deploy to Cloud Run
+        if: steps.gate.outputs.configured == 'true'
         run: |
           cd app
           gcloud run deploy aegis-app-gcp \
@@ -86,14 +100,14 @@ jobs:
             --allow-unauthenticated \
             --set-env-vars CLOUD_NAME=google-cloud-run
 
-  # Oracle deploy example — enable when you have a VM + SSH key secret.
+  # Enable this job only after provisioning an Oracle VM and adding SSH secrets.
   deploy-oracle:
+    if: false
     needs: [test, security-scan]
-    if: false   # set to true once ORACLE_VM_IP + ORACLE_SSH_KEY exist
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Deploy via SSH
+      - name: Deploy to Oracle VM
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.ORACLE_VM_IP }}

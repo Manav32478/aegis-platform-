@@ -1,13 +1,18 @@
-# Aegis — Self-Healing Multi-Cloud Platform
+# Aegis — Self-Healing Multi-Cloud Resilience Platform
 
-**Keep an application alive across three clouds automatically — on ₹0/month free tiers.**
+**Monitor application copies across cloud providers, understand origin health, and demonstrate controlled failover.**
 
-Aegis continuously monitors your app running on **Render, Vercel and Cloud Run**,
-detects failures before users notice, reroutes traffic to the healthiest cloud,
-and redeploys the broken one — all automatically, all inside free tiers.
+Aegis is a multi-cloud resilience prototype with a live control-plane dashboard,
+health-check history, an edge router, incident/alert records, and advisory
+intelligence. **Render is the currently active protected origin. A working Vercel
+origin must be deployed and registered before demonstrating two-origin failover;
+Cloud Run and Oracle are optional planned targets.**
 
-> 🎓 Major project · 6 months · 2 evaluations · See [`docs/`](docs/) for SRS,
-> architecture, evaluation plan, viva Q&A and the final report.
+The demo is designed to fit within free tiers at low traffic, but provider limits
+and overages can change. It is not an unconditional ₹0 or zero-downtime guarantee.
+
+> 🎓 Major project · See [`docs/`](docs/) for the architecture, deployment,
+> client explanation, evaluation guide, and production-readiness notes.
 
 ---
 
@@ -18,13 +23,14 @@ and redeploys the broken one — all automatically, all inside free tiers.
 | **Monitoring** | 5-min multi-region probes, latency percentiles (p50/p90/p95/p99), error rate, HTTP status, **live 10s on-demand probes** | Cloudflare cron + GitHub Actions + Oracle VM |
 | **Real-time** | Server-Sent Events push (`/api/stream`), live event feed, SLA tracking (99.9%), latency trends, sparklines | `web/realtime.js` + `web/data.js` |
 | **Intelligence** | Composite health score (0–100), rolling-statistics anomaly detection + Isolation Forest (ML), cost forecast, carbon-aware routing | `intelligence/` |
-| **Failover** | Edge router sends traffic to the healthiest cloud; automated redeploy ("self-heal") of a broken cloud | `orchestration/router/` |
-| **Alerting** | Down / recovered / degraded events → Slack, any webhook, or email (Resend free tier) | `orchestration/monitor.js` |
-| **Reporting** | Automated daily/weekly health reports stored in Supabase, CSV/JSON export | `orchestration/report.js`, `/api/export.*` |
-| **API** | Multi-tenant API with key auth, rate limiting, audit log, Swagger UI | `api/` |
-| **Web portal** | Landing page, live dashboard, public status page, admin console, **embeddable uptime badges**, dark/light theme | `web/` |
-| **Security** | Trivy (container), Checkov (IaC), OPA/Rego (policy) in CI | `.github/workflows/` |
-| **Testing** | 30 unit tests across analytics, anomaly, failover, cost, realtime, monitor | `tests/` |
+| **Failover** | Worker orders configured origins by health and proxies to the first healthy one; dashboard score is advisory and separate | `orchestration/router/` |
+| **Self-heal** | Optional GitHub redeploy dispatch; requires token, deploy workflow and provider hooks to be configured and tested | `orchestration/monitor.js` |
+| **Alerting** | Down / recovered / degraded records; Slack/webhook delivery when secrets are configured | `orchestration/monitor.js` |
+| **Reporting** | Daily/weekly report generator and CSV/JSON exports | `orchestration/report.js`, `/api/export.*` |
+| **API** | Prototype API-key auth, in-memory rate limiting, audit records, Swagger UI; tenant isolation needs production hardening | `api/` |
+| **Web portal** | Landing page, live dashboard, public status, admin console, uptime badges, dark/light theme | `web/` |
+| **Security** | Trivy, Checkov and OPA policy examples in CI; scan status must be checked per run | `.github/workflows/` |
+| **Testing** | 37 unit tests across analytics, anomaly, failover, config, dashboard script, realtime and monitor | `tests/` |
 
 ---
 
@@ -92,7 +98,7 @@ cd tests && npm install && npm test                             # run the test s
 ### Option C — macOS one-liner
 
 ```bash
-./start.sh
+bash start.sh
 ```
 
 ---
@@ -102,16 +108,18 @@ cd tests && npm install && npm test                             # run the test s
 | # | Cloud | URL | Health tracked? |
 |---|---|---|---|
 | 1 | Render (free) | `https://aegis-platform-pomf.onrender.com` | ✅ live |
-| 2 | Vercel (Hobby) | `https://aegis-platform-lyart.vercel.app` | ✅ live |
+| 2 | Vercel (Hobby) | `https://aegis-platform-qrhr.vercel.app` | ✅ live |
 | 3 | Cloud Run (free tier) / Oracle VM | planned — see `docs/DEPLOYMENT.md` | ➕ next |
 
-The **router** at `https://aegis-router.manav32478.workers.dev` always sends
-traffic to the healthiest cloud and records every decision.
+The **router** at `https://aegis-router.manav32478.workers.dev` is live and
+currently proxies to Render. Its current code tries configured healthy origins
+in configured order; the dashboard's composite health score is an advisory
+comparison, not the Worker's routing algorithm.
 
-To see **which of the 3 clouds is healthiest right now**, open the dashboard —
-it computes a composite score per cloud from live Supabase data and shows the
-routing decision. Full deployment playbook: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
-Zero-cost Oracle VM guide: [`docs/ORACLE_VM_SETUP.md`](docs/ORACLE_VM_SETUP.md).
+The dashboard shows the current configured origins and recorded Supabase
+history. Full deployment playbook: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+For the exact current Vercel/Supabase fixes, see
+[`docs/VERCEL_DASHBOARD_FIX.md`](docs/VERCEL_DASHBOARD_FIX.md).
 
 ---
 
@@ -126,7 +134,7 @@ aegis-platform/
 ├── packages/common/    # shared config + Supabase REST + analytics (zero deps)
 ├── app/                # the protected demo app (identical on every cloud)
 ├── infra/              # schema.sql + Terraform (optional)
-├── tests/              # 26 unit tests (Jest)
+├── tests/              # 37 unit tests (Jest)
 ├── docs/               # SRS, architecture, evaluation, guides, final report
 ├── .github/workflows/  # CI: deploy, monitor, ML, security scans
 └── docker-compose.yml  # run the whole platform with one command
@@ -161,11 +169,12 @@ aegis-platform/
 
 ---
 
-## 🧪 Status
+## 🧪 Current verified status (2026-11-12)
 
-- ✅ 2 clouds live (Render + Vercel), monitored every 5 min from Cloudflare edge + GitHub
-- ✅ Router live, failover decisions recorded
-- ✅ 26/26 unit tests passing
-- ✅ API v2 with rate limiting + audit log + Swagger
-- ✅ Professional portal (dashboard + status + admin)
-- ➕ Next: Oracle Always-Free VM for 24/7 control plane (guide included)
+- ✅ Render protected-app origin responds to `/health`.
+- ✅ Vercel protected-app origin `https://aegis-platform-qrhr.vercel.app/health` now responds; monitor target updated in Supabase. Deploy the router update to use this origin.
+- ✅ Cloudflare Worker router is live and serving Render; verify alternative-origin failover after configuring a live second app origin.
+- ⚠️ The public Vercel portal reports Supabase `PGRST125` (invalid REST URL path) until its `SUPABASE_URL` environment variable is corrected to the project root and redeployed.
+- ✅ Local test suite: 37/37 passing.
+- ⚠️ GitHub Actions latest security/deploy runs had failures; inspect Actions and rerun after updating the workflow.
+- ➕ Cloud Run and Oracle remain optional targets; neither is currently deployed.

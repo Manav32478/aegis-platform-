@@ -108,7 +108,7 @@ cd ~/Desktop/aegis-platform/orchestration/router && wrangler deploy
 |-------|-----|
 | Failover router | https://aegis-router.manav32478.workers.dev |
 | Cloud #1 (Render) | https://aegis-platform-pomf.onrender.com |
-| Cloud #2 (Vercel) | https://aegis-platform-lyart.vercel.app |
+| Cloud #2 (Vercel) | https://aegis-platform-qrhr.vercel.app |
 | Live status page | https://aegis-router.manav32478.workers.dev/status |
 | Dashboard | https://aegis-router.manav32478.workers.dev/dashboard |
 | GitHub repo | https://github.com/Manav32478/aegis-platform- |

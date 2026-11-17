@@ -178,7 +178,7 @@ def status_items():
         ("✓", GREEN, "Core app (Express) with /health contract + Dockerfile"),
         ("✓", GREEN, "2 LIVE cloud deployments — Render + Vercel (both free tiers)"),
         ("✓", GREEN, "https://aegis-platform-pomf.onrender.com/health"),
-        ("✓", GREEN, "https://aegis-platform-lyart.vercel.app/health"),
+        ("✓", GREEN, "https://aegis-platform-qrhr.vercel.app/health"),
         ("✓", GREEN, "FAILOVER ROUTER LIVE — https://aegis-router.manav32478.workers.dev"),
         ("✓", GREEN, "Health monitor → Supabase (auto-runs every 5 min)"),
         ("✓", GREEN, "Live status page on every cloud (/status)"),

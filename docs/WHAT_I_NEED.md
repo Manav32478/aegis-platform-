@@ -7,7 +7,7 @@
 | 3 | Supabase anon key | ✅ DONE | `sb_publishable_cwauqX8...` (in `.env`) |
 | 4 | Supabase tables | ✅ DONE | 4 tables created (health_checks, organizations, api_keys, risk_flags) |
 | 5 | Render URL | ✅ LIVE | `https://aegis-platform-pomf.onrender.com` — `/health` returns ok |
-| 6 | Vercel URL | ✅ LIVE | `https://aegis-platform-lyart.vercel.app` — `/health` returns ok |
+| 6 | Vercel URL | ✅ LIVE | `https://aegis-platform-qrhr.vercel.app` — `/health` returns ok |
 | 7 | Cloudflare account | ✅ LIVE | router deployed at `https://aegis-router.manav32478.workers.dev` |
 | 8 | GCP / Oracle | ⏳ PENDING | optional — cardless path is fine |
 | 9 | Electricity Maps | ⏳ PENDING | optional, Month 4 |
@@ -19,7 +19,7 @@ Go to repo → **Settings → Secrets and variables → Actions → New reposito
 |-------------|-------|
 | `SUPABASE_URL` | `https://kagjbxxmdyaypfcqemem.supabase.co` |
 | `SUPABASE_KEY` | `sb_publishable_cwauqX8Hq9ORgefEDU38cA_H4I-4qti` |
-| `TARGETS` | `[{"name":"render","url":"https://aegis-platform-pomf.onrender.com/health"},{"name":"vercel","url":"https://aegis-platform-lyart.vercel.app/health"}]` |
+| `TARGETS` | `[{"name":"render","url":"https://aegis-platform-pomf.onrender.com/health"},{"name":"vercel","url":"https://aegis-platform-qrhr.vercel.app/health"}]` |
 | `GCP_SA_KEY` | (only if you do GCP later) |
 | `SELF_HEAL_TOKEN` | (Month 3, optional) |
 

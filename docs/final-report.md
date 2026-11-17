@@ -124,7 +124,7 @@ Authorize, Supabase table rows, GitHub Actions green runs, chaos-test before/aft
 Live URLs:
 - Router: `https://aegis-router.manav32478.workers.dev`
 - Render: `https://aegis-platform-pomf.onrender.com`
-- Vercel: `https://aegis-platform-lyart.vercel.app`
+- Vercel: `https://aegis-platform-qrhr.vercel.app`
 - Status: `https://aegis-router.manav32478.workers.dev/status`
 
 ---
@@ -166,7 +166,7 @@ single-file dashboard into a full **microservices product**:
 
 **Verified live:** ~850 health checks in Supabase; the dashboard computes render
 (score 85) vs vercel (score 93) and routes to vercel; the anomaly detector flagged
-render's cold-start latency spikes; all 30 unit tests pass.
+render's cold-start latency spikes; the local suite now has 37 passing tests across 10 suites. Deployment audit notes and remaining work are recorded in `docs/STATUS.md`.
 
 ### v2.1 — the real-time layer (added for "make it a real product")
 

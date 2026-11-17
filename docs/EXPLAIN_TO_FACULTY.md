@@ -4,36 +4,35 @@
 > whole project in a viva / demo — from a 1-line answer up to a 10-minute
 > deep-dive. Practice the short versions out loud until they're natural.
 >
-> Your real numbers today (to quote): **882 health checks**, **Vercel 100%
-> uptime / 257 ms**, **Render 98% uptime / 457 ms**, total cost **₹0/month**.
+> Important: do not quote old sample metrics as current. On 2026-11-12 the
+> deployed portal reported Supabase URL errors and the configured Vercel origin
+> returned 404. Use `/api/diagnostics` and direct `/health` responses for fresh,
+> verified values before presenting.
 
 ---
 
 ## 1 · The whole project in ONE line
 
-> **"Aegis is a self-healing multi-cloud platform: it runs one small app on
-> three free-tier clouds, watches all of them every 5 minutes from outside,
-> scores each one's health, sends traffic to the healthiest, and automatically
-> re-deploys any cloud that fails — all at zero cost."**
+> **"Aegis is a multi-cloud resilience prototype: it monitors application
+> origins from outside the app fleet, records health history, provides an edge
+> routing path and a dashboard, and helps operators investigate failures."**
 
-Memorise this. Every other explanation is just expanding it.
+Then describe which origins are actually deployed and which behaviours have
+been tested. Do not promise zero downtime, score-aware routing, or zero cost.
 
 ---
 
 ## 2 · The 30-second version (opening question: "What is your project?")
 
-> "Most apps run on a single cloud. If that cloud has an outage, the app goes
-> down and there's nothing you can do. Free clouds are cheap but unreliable —
-> Render sleeps after 15 minutes of no traffic, for example.
->
-> My project, Aegis, treats clouds as **interchangeable and disposable**. I run
-> the same small app on Render, Vercel, and Cloud Run. A monitoring system that
-> lives **outside** these clouds — on Cloudflare Workers, GitHub Actions, and an
-> Oracle VM — checks each cloud every 5 minutes. It converts uptime, latency,
-> and error rate into a single health score from 0 to 100, and a router always
-> sends traffic to the highest-scoring cloud. If a cloud fails several checks in
-> a row, Aegis logs an incident, sends an alert, and **redeploys that cloud
-> automatically**. The entire system runs inside free tiers — zero rupees."
+> "A single hosting provider can become a single point of failure. Aegis is my
+> multi-cloud resilience prototype. It has a Render application origin, a
+> Cloudflare Worker router, a Supabase health-history database, a monitoring
+> workflow, and a dashboard with health and anomaly indicators. The system is
+> designed to support a second application origin and failover; I distinguish
+> the design from what I have currently deployed and verified. Today the
+> configured Vercel app origin is returning 404, and I am correcting that before
+> claiming two-origin failover. The cost and ML panels are estimates/signals,
+> not service-level guarantees."
 
 ---
 
@@ -47,70 +46,61 @@ individually unreliable. Commercial multi-cloud tools are expensive.
 **2) The idea** — run one app on three free clouds; monitor them from the
 outside; route to the healthiest; heal the broken one.
 
-**3) How it measures health** — every 5 minutes each cloud's `/health`
-endpoint is called (with latency timing). History lands in Supabase (Postgres).
-From that, I compute per cloud:
-- **uptime %**
-- **latency percentiles** (p50 / p90 / p95 / p99)
-- **error rate**
-- a single **health score = 0.5 × uptime + 0.3 × latency-score + 0.2 × (1 − error-rate)**
+**3) How it measures health** — scheduled checks call each configured `/health`
+endpoint and record latency/status in Supabase. The portal can also perform
+on-demand probes. From collected rows it calculates uptime, latency percentiles,
+error rate, and a project-defined health score. These values are indicators, not
+an external SLA.
 
-**4) How it heals** — the score decides routing. If a cloud fails 3 checks in
-a row, the monitor opens an incident, sends an alert (Slack/webhook), and
-dispatches a GitHub Actions redeploy of that cloud. When it recovers, the
-incident is closed with its downtime duration recorded.
+**4) How failover is designed** — the Worker checks configured origins and
+proxies to an available one. The current Worker uses configured order among
+healthy targets; the dashboard score is not yet connected to Worker routing.
+Incident alerts and automatic redeploy dispatch require their secrets/hooks to
+be configured and tested. Describe those as integration paths until verified.
 
-**5) What else makes it a "platform"** — predictive anomaly detection (ML),
-cost forecasting, carbon-aware routing, security scanning in CI, a multi-tenant
-API with API keys + rate limiting + audit log, automated health reports, and a
-real-time dashboard that updates every 10 seconds over Server-Sent Events.
-
----
-
-## 4 · The 10-minute deep-dive (if they ask "show me everything")
-
-Walk through these **in this order** and you cannot get lost:
-
-1. **Open the live dashboard** (`./start.sh` → `http://localhost:3100/dashboard.html`)
-   - KPI strip → explain the 4 headline numbers.
-   - **Real-time probes** → "this is the platform checking each cloud *right
-     now*, every 10 seconds — it's not a screenshot."
-   - **Live event feed** → "probes and routing decisions scrolling in real
-     time via Server-Sent Events, no page refresh."
-2. **Health score cards** → point at Vercel (93/Excellent) vs Render (85/Good)
-   and say: *"so right now traffic would go to Vercel."*
-3. **Latency + uptime charts** → the 99.9% SLA line; Render's slightly lower
-   uptime is the free-tier cold-start doing its thing.
-4. **Intelligence cards** → predictive risk, routing decision, SLA compliance.
-5. **Cost + carbon** → ₹0/month vs a paid single cloud; carbon table.
-6. **Incidents / alerts / failover** → even if empty, say *"these stay empty
-   because both clouds are healthy — empty is the good outcome; here's what it
-   looks like when something fails…"* (then explain the flow).
-7. **Status badges + export** → show the embeddable SVG badge + CSV export.
-8. **GitHub** → Actions tab: the green test run (30/30) and the deploy pipeline.
-9. **Supabase** → SQL Editor: show the real tables holding the 882 checks.
+**5) What else makes it a platform** — advisory anomaly detection, estimated
+cost/carbon views, security-workflow examples, an API, reports, and a portal.
+Be clear that data and features depend on correctly configured Supabase access
+and active origin URLs.
 
 ---
 
-## 5 · How to demo the "self-healing" live
+## 4 · A truthful 5-minute walkthrough
 
-The most convincing thing in the whole project. Two options:
+1. Start locally: `bash start.sh`; open `http://localhost:3100/dashboard.html`.
+2. Show **Diagnostics** first. It reports the Supabase row count, target source,
+   and unhealthy target URLs. Explain any warning rather than hiding it.
+3. Show **Real-time probes**. These are portal-originated probes; compare their
+   URLs/status with direct browser tabs for each origin.
+4. Show Supabase `health_checks` and GitHub Actions `Health monitor` runs as
+   evidence of scheduled checks.
+5. Show scores and charts as calculations over recorded history. State that the
+   displayed SLA target is a comparison, not a service guarantee.
+6. Show `/api/serving` or the Worker `/router/health` endpoint for router state.
+7. Show incidents/alerts only as actual records; do not invent a failure event.
+8. Show GitHub Actions and report actual run status. The latest CI state may not
+   be green; local tests currently pass 37/37.
 
-**Safe (recommended):** explain it, then show the *evidence* — the failover
-events table, the incidents table, and the router's `/health`. No risk.
+---
 
-**Dramatic (only if you've rehearsed and have time):**
-1. Open `https://aegis-platform-pomf.onrender.com` in a tab.
-2. In Render dashboard, **pause/suspend** the service (or just wait for a free
-   sleep), or temporarily stop the Render service.
-3. Watch the dashboard: within ~10 seconds the probe for Render flips to **DOWN**,
-   an incident opens, and the event feed logs it.
-4. Say: *"the router has already moved traffic to Vercel — users never noticed."*
-5. Re-enable Render → watch it flip back to UP and the incident close with a
-   recorded downtime duration.
+## 5 · How to demonstrate failover safely
 
-> If you don't want to touch Render: the offline chaos demo at
-> `node demo/server.js` → `localhost:8080` simulates the same failover safely.
+**Do not suspend the live Render service during a client demo without approval.**
+First deploy the same protected app to a live Vercel origin, update the database
+and Worker targets, and verify both `/health` endpoints return HTTP 200.
+
+Then use a staging copy:
+1. Query `https://aegis-router.manav32478.workers.dev/router/health` and record
+   each target's health.
+2. Suspend the staging origin that the router is currently using.
+3. Re-query router diagnostics and request the app through the Worker.
+4. Confirm the response identifies the alternate origin and the application
+   page still loads; inspect the incident/alert rows.
+5. Restore the staging origin and verify recovery.
+
+Until this controlled test passes, describe the Worker as a deployed routing
+prototype—not as verified zero-downtime failover. The local chaos demo is a
+simulation and should be labeled as such.
 
 ---
 
@@ -152,8 +142,9 @@ Give short answers first, expand only if they nod for more.
 
 ## 9 · The 3 numbers to memorise (fall back on these under pressure)
 
-1. **5 minutes** — probe interval (plus 10-second live probes in the UI)
-2. **0–100** — the health score (uptime·0.5 + latency·0.3 + error·0.2)
-3. **₹0/month** — total running cost
+1. **5 minutes** — scheduled monitoring interval (plus portal on-demand probes)
+2. **0–100** — project-defined health indicator (uptime·0.5 + latency·0.3 + error·0.2)
+3. **37 tests** — current local suite across 10 suites
 
-If a question scares you, return to one of these three and build outward.
+Describe free-tier cost as a target/estimate, not a guaranteed ₹0 bill. If a
+question surprises you, state what you verified and what remains to configure.

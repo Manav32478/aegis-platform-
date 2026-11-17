@@ -9,7 +9,7 @@
 ## THE NIGHT BEFORE (10 min)
 
 - [ ] **Charge the Mac**, plug it in during the demo.
-- [ ] Open Terminal once: `cd ~/Desktop/aegis-platform && ./start.sh`
+- [ ] Open Terminal once: `cd ~/Desktop/aegis-platform && bash start.sh`
   → portal opens. Keep it running; it auto-refreshes every 10 s.
 - [ ] Open 2 tabs kept ready:
   - `http://localhost:3100/dashboard.html`  ← the live dashboard
@@ -28,7 +28,7 @@
 - [ ] Practice the **3 numbers** you must know cold:
   - **5 min** — how often the platform probes each cloud
   - **0–100** — the health score scale (uptime + latency + error rate)
-  - **₹0/month** — total running cost
+  - **37 tests** — local suite result; cost is a free-tier estimate, not a guarantee
 
 ---
 
@@ -41,9 +41,9 @@
 5. **Failover proof** → router `/health` + explain:
    *"kill Render now and the router reroutes within seconds"*
    (only do this if the external is comfortable with a 30-second hiccup)
-6. **GitHub** → Actions tab → show the green test run (30/30) + deploy pipeline
+6. **GitHub** → Actions tab → show the latest test, monitor, and scan runs; report their actual status (local suite: 37 tests in 10 suites).
 7. **Supabase** → SQL Editor → show the 10 tables (evidence the data is real)
-8. **Cost + carbon** → "₹0/month vs ~$40 for one paid cloud + 12-month forecast"
+8. **Cost + carbon** → explain the chart is an illustrative workload estimate; compare it with actual provider billing before quoting savings.
 
 ---
 

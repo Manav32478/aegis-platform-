@@ -8,11 +8,11 @@
 ## 🔐 1. Unlock it (the "admin token")
 
 **You just fixed this — it now works out of the box.** When you run
-`./start.sh`, the server starts with token **`aegis-demo`**.
+`bash start.sh`, the server starts with token **`aegis-demo`** for local demo use.
 
 To use the admin page:
 
-1. Start the platform:  `./start.sh`  →  open `http://localhost:3100/admin.html`
+1. Start the platform:  `bash start.sh`  →  open `http://localhost:3100/admin.html`
 2. In the **"Admin token" box**, type **`aegis-demo`** → click **Save token**.
 
 That's it. The page unlocks. (The token is saved in that browser, so you only

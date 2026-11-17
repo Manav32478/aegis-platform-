@@ -238,7 +238,7 @@ create policy "anon delete reports" on health_reports for delete using (true);
 insert into monitor_targets (cloud_name, url, region, enabled)
 values
   ('render',           'https://aegis-platform-pomf.onrender.com/health', 'oregon',      true),
-  ('vercel',           'https://aegis-platform-lyart.vercel.app/health',  'global edge', true),
+  ('vercel',           'https://aegis-platform-qrhr.vercel.app/health',  'global edge', true),
   ('google-cloud-run', 'https://aegis-app-gcp.a.run.app/health',           'us-central1', false),
   ('oracle-cloud',     'http://YOUR_ORACLE_VM_IP/health',                  'ap-mumbai-1', false)
 on conflict (cloud_name) do nothing;

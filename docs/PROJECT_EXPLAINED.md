@@ -86,7 +86,7 @@ Live deployments:
 | Cloud | URL | How |
 |-------|-----|-----|
 | Render (free) | `aegis-platform-pomf.onrender.com` | Docker build |
-| Vercel (free) | `aegis-platform-lyart.vercel.app` | serverless (`app/api/index.js` + `vercel.json`) |
+| Vercel (free) | `aegis-platform-qrhr.vercel.app` | serverless (`app/api/index.js` + `vercel.json`) |
 | GCP / Oracle | ready | code already supports them |
 
 ### Layer 4 — Data (Supabase) — `infra/schema.sql`

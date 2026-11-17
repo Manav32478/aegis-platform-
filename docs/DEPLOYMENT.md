@@ -78,7 +78,7 @@ The Worker + monitor then watch all of them automatically.
 **Method 2 — plain URLs:**
 - `https://aegis-router.manav32478.workers.dev/health` → shows which cloud **serves**
 - `https://aegis-platform-pomf.onrender.com/health` → direct to Render
-- `https://aegis-platform-lyart.vercel.app/health` → direct to Vercel
+- `https://aegis-platform-qrhr.vercel.app/health` → direct to Vercel
 Kill one cloud → the router URL changes its answer within ~10 seconds.
 
 **Why you can trust the switch happened:** every probe, incident, alert and
@@ -135,7 +135,7 @@ sudo docker compose up -d --build     # portal on :3100, monitor every 5 min
 
 ## 7. Local development
 ```bash
-cd aegis-platform && ./start.sh          # whole platform, one command
+cd aegis-platform && bash start.sh       # whole platform, one command
 # or:
 docker compose up --build
 ```
