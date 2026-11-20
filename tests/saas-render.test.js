@@ -25,7 +25,7 @@ const portalData = {
 };
 const originData = { checkedAt: portalData.generatedAt, origins: [origin], diagnostics: {}, routerStatus: { available: false }, historyRows: 0 };
 
-async function render(route, mode) {
+async function render(route, mode, override) {
   const elements = {};
   for (const id of ['page-content', 'sidebar', 'mobile-overlay', 'crumb-current', 'menu-button', 'refresh-button']) {
     elements[id] = { innerHTML: '', textContent: '', classList: { add() {}, remove() {}, toggle() {} }, addEventListener() {}, prepend() {} };
@@ -34,7 +34,7 @@ async function render(route, mode) {
     document: { body: { dataset: { mode } }, getElementById: id => elements[id], querySelectorAll: () => [], hidden: false, createElement: () => ({}) },
     window: { location: { pathname: route, origin: 'http://localhost' }, addEventListener() {} },
     URL, Date, Number, String, Array, Object, Math,
-    fetch: async () => ({ ok: true, json: async () => mode === 'portal' ? portalData : originData }),
+    fetch: async () => ({ ok: true, json: async () => override || (mode === 'portal' ? portalData : originData) }),
     setInterval: () => 1, clearInterval() {},
   };
   vm.runInNewContext(source, context);
@@ -56,4 +56,17 @@ test('escapes messages from the database', async () => {
   const html = await render('/dashboard/alerts', 'portal');
   expect(html).toContain('&lt;script&gt;unsafe&lt;/script&gt;');
   expect(html).not.toContain('<script>unsafe</script>');
+});
+
+
+test('a history read failure is displayed as unavailable rather than zero', async () => {
+  const html = await render('/dashboard', 'portal', { ...portalData, diagnostics: { historyRows: 0, historyAvailable: false, incidentsAvailable: true, alertsAvailable: true } });
+  expect(html).toContain('History could not be read');
+  expect(html).toContain('Could not read stored checks');
+  expect(html).toContain('Unavailable');
+});
+
+test('origin workspace provides a link to the configured portal', async () => {
+  const html = await render('/dashboard', 'origin', { ...originData, portalUrl: 'https://portal.example' });
+  expect(html).toContain('https://portal.example/dashboard');
 });

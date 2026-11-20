@@ -1,3 +1,5 @@
+> **Live-service repair:** Read `LIVE_TROUBLESHOOTING.md` first for the observed Vercel 404, intermittent database history failures, deployment and validation steps. This ZIP cannot repair provider accounts by itself.
+
 # Aegis — redesigned workspace: setup, testing and deployment
 
 This is the current guide for the redesigned version. Older README and files under `docs/` describe earlier versions and may contain outdated routes, pricing, deployments or claims; use this guide when they conflict.
@@ -161,7 +163,7 @@ For the Worker's optional scheduled monitor, also set `SUPABASE_URL` and `SUPABA
 npx wrangler deploy
 ```
 
-Visit `https://YOUR-WORKER.workers.dev/router/health`. The target list and cached health should match your intended Worker configuration. Visit `/health` through the Worker too. Do not confuse the Worker base-URL `TARGETS` secret with the Node monitor `TARGETS` variable, which expects full health URLs. Configure the portal database, app `AEGIS_TARGETS`, and Worker targets independently, then compare them. Use only enabled target entries in the Worker JSON: its environment parser does not filter disabled entries.
+Visit `https://YOUR-WORKER.workers.dev/router/health`. The target list and cached health should match your intended Worker configuration. Visit `/health` through the Worker too. Do not confuse the Worker base-URL `TARGETS` secret with the Node monitor `TARGETS` variable, which expects full health URLs. Configure the portal database, app `AEGIS_TARGETS`, and Worker targets independently, then compare them. The updated Worker source filters entries marked enabled:false; deployed Worker behavior changes only after a successful deployment.
 
 ## 6. Safe failover test
 

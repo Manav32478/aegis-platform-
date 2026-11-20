@@ -82,6 +82,7 @@
         diagnostics: raw.diagnostics || {},
         monthlyRequests: raw.monthlyRequests,
         historyRows: Number(raw.diagnostics && raw.diagnostics.historyRows || raw.totalChecks || 0),
+        historyAvailable: raw.diagnostics && typeof raw.diagnostics.historyAvailable === 'boolean' ? raw.diagnostics.historyAvailable : null,
         router: raw.router || null,
         routerStatus: raw.routerStatus || null,
         route: raw.route || null,
@@ -100,6 +101,7 @@
       alerts: [],
       diagnostics: raw.diagnostics || {},
       historyRows: Number(raw.historyRows || 0),
+      historyAvailable: false,
       router: raw.router || null,
       routerStatus: raw.routerStatus || null,
       route: null,
@@ -164,8 +166,8 @@
       const url = safeLink(o.url || '');
       return '<tr><td><div class="origin-name">' + escapeHtml(o.name || 'Unnamed origin') + '</div><div class="origin-sub">' + escapeHtml(o.url || 'No health URL configured') + '</div></td>' +
         '<td>' + healthPill(o) + '</td><td>' + (latency != null ? escapeHtml(latency) + ' ms' : '—') + '</td>' +
-        '<td class="muted hide-mid">' + escapeHtml(o.region || '—') + '</td><td class="muted">' + (status != null ? 'HTTP ' + escapeHtml(status) : (o.enabled === false ? 'Not probed' : 'No response')) + '</td>' +
-        '<td>' + (url !== '#' ? '<a class="button small" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">Open ↗</a>' : '') + '</td></tr>';
+        '<td class="muted hide-mid">' + escapeHtml(o.region || '—') + '</td><td class="muted">' + (status > 0 ? 'HTTP ' + escapeHtml(status) : (o.enabled === false ? 'Not probed' : 'No response')) + '</td>' +
+        '<td>' + (url !== '#' && o.enabled !== false ? '<a class="button small" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">Open ↗</a>' : '') + '</td></tr>';
     }).join('') + '</tbody></table></div>';
   }
 
@@ -175,38 +177,40 @@
       const latency = o.latency != null ? o.latency : o.latencyMs;
       const status = o.status != null ? o.status : o.httpStatus;
       return '<article class="origin-card"><div class="origin-card-head"><div><h3><i class="state-dot ' + (o.enabled === false ? 'planned' : (o.healthy ? 'up' : 'down')) + '"></i>' + escapeHtml(o.name || 'Unnamed origin') + '</h3><p>' + escapeHtml(o.region || 'Region not specified') + '</p></div>' + healthPill(o) + '</div>' +
-        '<p>' + escapeHtml(o.url || 'This target is not deployed or has no URL configured.') + '</p><div class="origin-card-metrics"><div><div class="metric-label">Response</div><div class="metric-value">' + (latency != null ? escapeHtml(latency) + ' ms' : '—') + '</div></div><div><div class="metric-label">HTTP status</div><div class="metric-value">' + (status != null ? 'HTTP ' + escapeHtml(status) : (o.enabled === false ? 'Not probed' : '—')) + '</div></div></div></article>';
+        '<p>' + escapeHtml(o.url || 'This target is not deployed or has no URL configured.') + '</p><div class="origin-card-metrics"><div><div class="metric-label">Response</div><div class="metric-value">' + (latency != null ? escapeHtml(latency) + ' ms' : '—') + '</div></div><div><div class="metric-label">HTTP status</div><div class="metric-value">' + (status > 0 ? 'HTTP ' + escapeHtml(status) : (o.enabled === false ? 'Not probed' : 'No response')) + '</div></div></div></article>';
     }).join('') + '</div>';
   }
 
   function noHistoryNote(model) {
-    if (model.historyRows > 0) return '';
-    if (mode === 'portal') return '<div class="notice info"><strong>Historical data is empty or unavailable.</strong> The live probe results below are separate from persisted history. Check the portal diagnostics and database configuration before relying on uptime calculations.</div>';
-    return '<div class="notice info"><strong>Live probes only.</strong> This application origin does not currently expose the Supabase history service. Connect the control-plane portal to see persisted checks and incident records.</div>';
+    if (mode === 'portal' && model.historyAvailable === false) return '<div class="notice"><strong>History could not be read.</strong> The number of stored checks is unknown. Live probes and incident queries are separate. <a href="/api/diagnostics"><strong>Open diagnostics ↗</strong></a></div>';
+    if (mode === 'portal' && model.historyRows > 0) return '';
+    if (mode === 'portal') return '<div class="notice info"><strong>No history rows were returned.</strong> Check the monitor, database and <a href="/api/diagnostics"><strong>diagnostics</strong></a>. This does not prove no checks exist.</div>';
+    const portal = safeLink(model.portalUrl);
+    return '<div class="notice info"><strong>Live probes only.</strong> This application origin does not provide stored history or incidents. ' + (portal !== '#' ? '<a href="' + escapeHtml(portal.replace(/\/+$/, '') + '/dashboard') + '"><strong>Open the control-plane portal ↗</strong></a>' : 'Open the control-plane portal to view stored history.') + '</div>'; 
   }
 
   function renderOverview(model) {
     const active = activeOrigins(model);
     const online = active.filter(isOnline).length;
-    const latencies = active.filter(isOnline).map(o => o.latency != null ? o.latency : o.latencyMs).filter(n => Number.isFinite(Number(n))).map(Number);
+    const latencies = active.filter(isOnline).map(o => o.latency != null ? o.latency : o.latencyMs).filter(n => n != null && Number.isFinite(Number(n))).map(Number);
     const avg = latencies.length ? Math.round(latencies.reduce((a,b)=>a+b,0)/latencies.length) + ' ms' : '—';
     const open = openIncidents(model).length;
-    const countText = mode === 'portal' ? String(model.historyRows || 0) : 'Not connected';
+    const countText = mode === 'portal' ? (model.historyAvailable === false ? 'Unavailable' : String(model.historyRows || 0)) : 'Not connected';
     let html = header('dashboard', '<a class="button" href="/status">Public status ↗</a>') + noHistoryNote(model);
     html += '<section class="grid kpi-grid">' +
       metricCard('◇', 'Origins operational', online + ' / ' + active.length, 'Based on latest direct probes') +
       metricCard('⌁', 'Mean live latency', avg, latencies.length ? 'Successful enabled-origin probes' : 'No successful probe available') +
-      metricCard('▤', 'Recorded checks', countText, mode === 'portal' ? 'Returned by the configured data source' : 'History service not connected here') +
+      metricCard('▤', 'Recorded checks', countText, mode === 'portal' ? (model.historyAvailable === false ? 'Could not read stored checks' : 'Recent rows returned; not necessarily total') : 'History service not connected here') +
       metricCard('◷', 'Open incidents', mode === 'portal' && model.diagnostics.incidentsAvailable ? String(open) : 'Unavailable', mode === 'portal' && model.diagnostics.incidentsAvailable ? 'From incident records' : 'Incident records could not be verified') +
       '</section>';
     html += '<section class="grid two-grid"><div class="panel"><div class="panel-head"><div><h2>Application origins</h2><p>Latest health result by configured target</p></div><a class="button small" href="/dashboard/services">View services →</a></div>' + originTable(model.origins, 5) + '</div>';
     html += '<div class="panel"><div class="panel-head"><div><h2>Operational notes</h2><p>What the current data can and cannot tell you</p></div></div>' +
-      '<div class="setting-row"><div><strong>Last refresh</strong><p>' + escapeHtml(formatTime(model.checkedAt)) + '</p></div><span class="subtle-pill">' + (lastError ? 'Stale' : 'Current request') + '</span></div>' +
-      '<div class="setting-row"><div><strong>Routing mode</strong><p>Healthy origins in configured order</p></div></div>' +
+      '<div class="setting-row"><div><strong>Last refresh</strong><p>' + escapeHtml(formatTime(model.checkedAt)) + '</p></div><span class="subtle-pill">' + (lastError ? 'Stale' : 'Snapshot') + '</span></div>' +
+      '<div class="setting-row"><div><strong>Routing mode</strong><p>Worker source: healthy origins in configured order; verify deployed Worker.</p></div></div>' +
       '<div class="setting-row"><div><strong>Availability target</strong><p>For comparison only; no SLA is configured.</p></div></div>' +
-      (mode === 'portal' && (model.diagnostics.warnings || []).length ? '<div class="notice" style="margin-top:14px">' + escapeHtml(model.diagnostics.warnings.slice(0,2).join(' · ')) + '</div>' : '<div class="callout" style="margin-top:14px">Aegis is an evaluation prototype. Run a controlled staging test before making a failover or availability claim.</div>') +
+      (mode === 'portal' && (model.diagnostics.warnings || []).length ? '<div class="notice" style="margin-top:14px">' + escapeHtml(model.diagnostics.warnings.join(' · ')) + ' <a href="/api/diagnostics"><strong>Diagnostics ↗</strong></a></div>' : '<div class="callout" style="margin-top:14px">Aegis is an evaluation prototype. Run a controlled staging test before making a failover or availability claim.</div>') +
       '</div></section>';
-    html += '<div class="footer-note">Snapshot timestamp: ' + escapeHtml(formatTime(model.checkedAt)) + ' · Historical metrics are shown only when the data source returns stored checks.</div>';
+    html += '<div class="footer-note">Snapshot timestamp: ' + escapeHtml(formatTime(model.checkedAt)) + ' · History shows a limited recent sample, not necessarily all recorded checks.</div>';
     return html;
   }
 
@@ -322,7 +326,7 @@
     html+='<div class="notice"><strong>Prototype boundary:</strong> this workspace does not currently implement production user accounts, billing, organisation-level data isolation or a customer-facing control for editing deployment secrets.</div>';
     html+='<div class="panel"><div class="panel-head"><div><h2>Connection status</h2><p>Safe summary only. Secret values are never displayed.</p></div></div>';
     html+='<div class="setting-row"><div><strong>Live origin probes</strong><p>Checked at '+escapeHtml(formatTime(model.checkedAt))+'</p></div><span class="status-pill">'+activeOrigins(model).length+' configured</span></div>';
-    html+='<div class="setting-row"><div><strong>Persistent history</strong><p>'+(model.historyRows>0?escapeHtml(model.historyRows)+' stored rows returned':'No stored check rows returned by this view')+'</p></div><span class="status-pill '+(model.historyRows>0?'':'neutral')+'">'+(model.historyRows>0?'Connected':'Needs verification')+'</span></div>';
+    html+='<div class="setting-row"><div><strong>Persistent history</strong><p>'+(model.historyAvailable === false ? 'Could not read history' : model.historyRows>0?escapeHtml(model.historyRows)+' recent rows returned':'No stored check rows returned by this view')+'</p></div><span class="status-pill '+(model.historyRows>0?'':'neutral')+'">'+(model.historyAvailable === false ? 'Unavailable' : model.historyRows>0?'Connected':'Needs verification')+'</span></div>';
     html+='<div class="setting-row"><div><strong>Router metadata</strong><p>Verify the Worker health endpoint and deployed target list.</p></div><span class="status-pill '+(model.routerStatus && model.routerStatus.available !== false?'':'neutral')+'">'+(model.routerStatus && model.routerStatus.available !== false?'Available':'Not confirmed')+'</span></div>';
     html+='<div class="setting-row"><div><strong>Authentication</strong><p>Admin token and API-key mechanisms are prototype-grade; secure configuration is required.</p></div><span class="status-pill neutral">Prototype</span></div>';
     html+='</div>' + (mode === 'portal' ? '<div class="callout">Target administration is available separately at <a href="/admin.html"><strong>/admin.html</strong></a> after setting a strong ADMIN_TOKEN. Changes require database permissions and do not automatically change Worker targets.</div>' : '') + '<div class="panel"><div class="panel-head"><div><h2>Deployment checklist</h2><p>Use the project guide for provider-specific configuration.</p></div></div><ol class="muted"><li>Set environment values in the hosting provider’s settings, never in the ZIP.</li><li>Deploy the portal and protected app as separate projects with the correct root directories.</li><li>Deploy the Worker after updating its origins and secret bindings.</li><li>Run health, diagnostics and staging failover checks before presenting the platform.</li></ol></div>';

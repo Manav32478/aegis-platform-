@@ -23,3 +23,21 @@ test('broadcasts snapshots to all subscribers', async () => {
 
   off();
 });
+
+test('expired snapshots are rebuilt and concurrent requests share one build', async () => {
+  let now = Date.now();
+  const spy = jest.spyOn(Date, 'now').mockImplementation(() => now);
+  try {
+    now += 100000;
+    let builds = 0;
+    const provider = async () => { builds++; return { sequence: builds }; };
+    const first = await realtime.getSnapshot(provider);
+    expect(first.sequence).toBe(1);
+    expect((await realtime.getSnapshot(provider)).sequence).toBe(1);
+    now += 30001;
+    const [a, b] = await Promise.all([realtime.getSnapshot(provider), realtime.getSnapshot(provider)]);
+    expect(a.sequence).toBe(2);
+    expect(b.sequence).toBe(2);
+    expect(builds).toBe(2);
+  } finally { spy.mockRestore(); }
+});

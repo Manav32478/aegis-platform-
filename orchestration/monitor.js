@@ -91,15 +91,21 @@ function detectEvent(results) {
  * Returns a list of {type:'open'|'close', ...} transitions.
  * Offline-safe: skips silently when tables/keys are absent.
  */
-async function maintainIncidents({ down }) {
+function recoveredIncidentNames(open, results) {
+  const healthyNames = new Set((results || []).filter(r => r.healthy === true).map(r => r.name));
+  return open.filter(inc => healthyNames.has(inc.cloud_name)).map(inc => inc.cloud_name);
+}
+
+async function maintainIncidents({ down, results = [] }) {
   const transitions = [];
   try {
     const openRows = await sb('/rest/v1/incidents?select=*&ended_at=is.null&order=id.asc');
     const open = Array.isArray(openRows) ? openRows : [];
 
-    // close incidents for clouds that are now healthy
+    // Only close incidents after an actual successful probe of that origin.
+    const recoveredNames = new Set(recoveredIncidentNames(open, results));
     for (const inc of open) {
-      if (!down.includes(inc.cloud_name)) {
+      if (recoveredNames.has(inc.cloud_name)) {
         const ended = new Date().toISOString();
         const started = new Date(inc.started_at).getTime();
         const duration = Math.max(0, Math.round((Date.now() - started) / 1000));
@@ -279,7 +285,7 @@ async function main() {
   console.log(`[monitor] ${saveMsg}`);
 
   const { down, degraded } = detectEvent(results);
-  const transitions = await maintainIncidents({ down });
+  const transitions = await maintainIncidents({ down, results });
   for (const t of transitions) {
     console.log(`[incident] ${t.type} ${t.cloud}${t.durationSeconds ? ` (${t.durationSeconds}s)` : ''}`);
   }
@@ -307,6 +313,7 @@ module.exports = {
   analyzeHistory,
   detectEvent,
   maintainIncidents,
+  recoveredIncidentNames,
   deliverAlerts,
   maybeSelfHeal,
   resolveTargets,

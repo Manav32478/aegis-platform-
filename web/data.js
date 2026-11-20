@@ -102,8 +102,11 @@ async function probeAll(targetConfig) {
 async function provideSnapshot() {
   const warnings = [];
   let rows = [];
+  let historyAvailable = false;
   try {
     rows = await getHealthChecks(2000);
+    if (!Array.isArray(rows)) throw new Error('Unexpected history response');
+    historyAvailable = true;
   } catch (e) {
     warnings.push('Supabase health history could not be read: ' + safeError(e));
   }
@@ -176,7 +179,8 @@ async function provideSnapshot() {
   const proxy = {
     currentCloud: router ? router.serving : null,
     routerAlive: !!router,
-    failoverActive: Array.isArray(openIncidents) && openIncidents.length > 0,
+    // An open incident does not prove that traffic was rerouted.
+    failoverActive: null,
     failedClouds: Array.isArray(openIncidents) ? openIncidents.map((i) => i.cloud_name) : [],
   };
 
@@ -218,6 +222,8 @@ async function provideSnapshot() {
     vantage: MONITOR_REGION,
     diagnostics: {
       historyRows: filtered.length,
+      historyAvailable,
+      historyLimit: 2000,
       incidentsAvailable,
       alertsAvailable,
       targetSource: targetConfig.source,

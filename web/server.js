@@ -35,7 +35,8 @@ app.use((req, res, next) => {
 });
 
 // ---- start the realtime hub (10s tick: probe clouds + broadcast) ----------
-realtime.start(provideSnapshot);
+// Serverless invocations cannot rely on a durable background timer.
+if (!process.env.VERCEL) realtime.start(provideSnapshot);
 
 // ---- real-time stream (SSE) ------------------------------------------------
 app.get('/api/stream', (req, res) => {
@@ -74,8 +75,8 @@ app.get('/api/aggregate', async (req, res) => {
 
 app.get('/api/live', async (req, res) => {
   try {
-    // cached if fresh, else build
-    res.json(realtime.getCache() || (await provideSnapshot()));
+    res.set('Cache-Control', 'no-store');
+    res.json(await realtime.getSnapshot(provideSnapshot));
   } catch (e) {
     res.status(502).json({ error: e.message });
   }

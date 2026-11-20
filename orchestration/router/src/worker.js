@@ -19,7 +19,9 @@ const DEFAULT_TARGETS = [
 function targets(env) {
   if (env && env.TARGETS) {
     try {
-      return JSON.parse(env.TARGETS);
+      const configured = JSON.parse(env.TARGETS);
+      if (Array.isArray(configured)) return configured.filter(t => t && t.enabled !== false && typeof t.url === 'string' && t.url);
+      throw new Error('TARGETS must be an array');
     } catch {
       /* fall through */
     }
@@ -138,8 +140,9 @@ export default {
       '/rest/v1/incidents?select=*&ended_at=is.null&order=id.asc'
     );
     const downNames = results.filter((r) => !r.ok).map((r) => r.target.name);
+    const healthyNames = new Set(results.filter((r) => r.ok).map((r) => r.target.name));
     for (const inc of Array.isArray(openIncidents) ? openIncidents : []) {
-      if (!downNames.includes(inc.cloud_name)) {
+      if (healthyNames.has(inc.cloud_name)) {
         const started = new Date(inc.started_at).getTime();
         const duration = Math.max(0, Math.round((Date.now() - started) / 1000));
         await fetch(

@@ -5,14 +5,25 @@ const { SUPABASE_URL, SUPABASE_KEY } = require('./config');
 
 /** supabase(`/rest/v1/health_checks?...`, {method, body}) → parsed JSON */
 async function sb(path, opts = {}) {
-  const res = await fetch(`${SUPABASE_URL}${path}`, {
-    ...opts,
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      ...(opts.headers || {}),
-    },
-  });
+  const method = String(opts.method || 'GET').toUpperCase();
+  let res;
+  // Retry a transient network failure once for reads only; never retry writes.
+  for (let attempt = 0; attempt < (method === 'GET' && !opts.signal ? 2 : 1); attempt++) {
+    try {
+      res = await fetch(`${SUPABASE_URL}${path}`, {
+        ...opts,
+        signal: opts.signal || AbortSignal.timeout(method === 'GET' ? 4000 : 8000),
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+          ...(opts.headers || {}),
+        },
+      });
+      break;
+    } catch (error) {
+      if (attempt > 0 || method !== 'GET' || opts.signal) throw error;
+    }
+  }
   if (!res.ok) {
     throw new Error(`supabase ${res.status}: ${(await res.text()).slice(0, 400)}`);
   }

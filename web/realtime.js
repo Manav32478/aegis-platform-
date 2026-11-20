@@ -14,6 +14,9 @@
 const clients = new Set();
 let timer = null;
 let cache = null;
+let cacheTime = 0;
+let inFlight = null;
+const CACHE_MAX_AGE_MS = 30000;
 
 function subscribe(fn) {
   clients.add(fn);
@@ -23,12 +26,24 @@ function subscribe(fn) {
 }
 
 function getCache() {
-  return cache;
+  return cache && Date.now() - cacheTime <= CACHE_MAX_AGE_MS ? cache : null;
+}
+
+async function getSnapshot(provide) {
+  const fresh = getCache();
+  if (fresh) return fresh;
+  if (!inFlight) {
+    inFlight = Promise.resolve().then(provide).then(snap => {
+      if (snap) { cache = snap; cacheTime = Date.now(); }
+      return snap;
+    }).finally(() => { inFlight = null; });
+  }
+  return inFlight;
 }
 
 async function run(provide) {
   try {
-    const snap = await provide();
+    const snap = await getSnapshot(provide);
     if (!snap) return;
     cache = snap;
     const msg = JSON.stringify({ type: 'update', at: new Date().toISOString(), ...snap });
@@ -61,4 +76,4 @@ function stop() {
   clients.clear();
 }
 
-module.exports = { subscribe, getCache, start, stop };
+module.exports = { subscribe, getCache, getSnapshot, start, stop };

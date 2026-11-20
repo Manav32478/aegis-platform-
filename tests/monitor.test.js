@@ -20,3 +20,11 @@ test('summarize computes uptime % and average latency per cloud', () => {
 test('summarize handles empty input', () => {
   expect(summarize([])).toEqual([]);
 });
+
+test('only a positively healthy monitored target can resolve its incident', () => {
+  const { recoveredIncidentNames } = require('../orchestration/monitor');
+  const incidents = [{ cloud_name: 'healthy' }, { cloud_name: 'down' }, { cloud_name: 'not-monitored' }];
+  const results = [{ name: 'healthy', healthy: true }, { name: 'down', healthy: false }];
+  expect(recoveredIncidentNames(incidents, results)).toEqual(['healthy']);
+  expect(recoveredIncidentNames(incidents, [])).toEqual([]);
+});
