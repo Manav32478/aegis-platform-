@@ -10,3 +10,5 @@ crons = ["*/5 * * * *"]
 # Set Supabase via secrets (run these once):
 #   wrangler secret put SUPABASE_URL
 #   wrangler secret put SUPABASE_KEY
+[vars]
+TARGETS = '[{"name":"render","url":"https://aegis-platform-pomf.onrender.com"},{"name":"vercel","url":"https://aegis-platform-11f7.vercel.app"}]'
