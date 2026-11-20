@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101a2d">
+  <meta name="description" content="Aegis multi-cloud operations workspace">
+  <title>Aegis Workspace</title>
+  <link rel="stylesheet" href="/assets/saas.css">
+</head>
+<body data-mode="origin">
+  <div class="mobile-overlay" id="mobile-overlay"></div>
+  <div class="app-layout">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="/" aria-label="Aegis home">
+        <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.5 20 5.7v5.8c0 5.2-3.3 8.7-8 10.8-4.7-2.1-8-5.6-8-10.8V5.7l8-3.2Z" stroke="white" stroke-width="1.7"/><path d="m8.4 12.1 2.3 2.2 4.9-5" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span>Aegis<small>Operations</small></span>
+      </a>
+      <div class="nav-caption">Workspace</div>
+      <nav class="side-nav" aria-label="Main navigation">
+        <a class="nav-link" href="/dashboard" data-page="dashboard"><span class="nav-icon">◫</span>Overview</a>
+        <a class="nav-link" href="/dashboard/services" data-page="services"><span class="nav-icon">◇</span>Services</a>
+        <a class="nav-link" href="/dashboard/monitoring" data-page="monitoring"><span class="nav-icon">⌁</span>Monitoring</a>
+        <a class="nav-link" href="/dashboard/incidents" data-page="incidents"><span class="nav-icon">◷</span>Incidents</a>
+        <a class="nav-link" href="/dashboard/alerts" data-page="alerts"><span class="nav-icon">♧</span>Alerts</a>
+        <a class="nav-link" href="/dashboard/routing" data-page="routing"><span class="nav-icon">⇄</span>Traffic routing</a>
+      </nav>
+      <div class="nav-caption">Manage</div>
+      <nav class="side-nav" aria-label="Management navigation">
+        <a class="nav-link" href="/dashboard/insights" data-page="insights"><span class="nav-icon">◒</span>Insights</a>
+        <a class="nav-link" href="/dashboard/developers" data-page="developers"><span class="nav-icon">⌘</span>Developers</a>
+        <a class="nav-link" href="/dashboard/settings" data-page="settings"><span class="nav-icon">⚙</span>Settings</a>
+        <a class="nav-link" href="/status" data-page="status"><span class="nav-icon">◉</span>Public status</a>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="workspace-tag"><span class="workspace-dot"></span>Prototype workspace</div>
+        Monitoring and routing features are shown with their current verification state. No production SLA is configured.
+      </div>
+    </aside>
+    <div class="main-column">
+      <header class="topbar">
+        <div class="top-actions">
+          <button class="top-button mobile-menu" id="menu-button" type="button" aria-label="Open navigation">☰</button>
+          <span class="crumb">Workspace <span aria-hidden="true">/</span> <strong id="crumb-current">Overview</strong></span>
+        </div>
+        <div class="top-actions">
+          <span class="prototype-pill"><span class="state-dot planned"></span>Prototype · not an SLA</span>
+          <button class="top-button" id="refresh-button" type="button">↻ Refresh</button>
+          <a class="top-button" href="/">Product site</a>
+        </div>
+      </header>
+      <main class="content" id="page-content" aria-live="polite">
+        <div class="empty-state"><strong>Loading workspace</strong>Checking configured application origins…</div>
+      </main>
+    </div>
+  </div>
+  <script src="/assets/saas.js" defer></script>
+</body>
+</html>

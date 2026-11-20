@@ -67,7 +67,7 @@ async function resolveTargets() {
 async function probe(t) {
   const target = healthUrl(t.url);
   if (t.enabled === false) {
-    return { name: t.name || 'unnamed-target', healthy: false, latency: null, status: null,
+    return { name: t.name || 'unnamed-target', region: t.region, healthy: false, latency: null, status: null,
       url: target, enabled: false, reason: 'not deployed (disabled)' };
   }
   const start = Date.now();
@@ -79,7 +79,7 @@ async function probe(t) {
       try { info = await res.json(); } catch { /* health response can be non-JSON */ }
     }
     return {
-      name: t.name || 'unnamed-target', healthy,
+      name: t.name || 'unnamed-target', region: t.region, healthy,
       latency: healthy ? Date.now() - start : null,
       status: res.status, url: target, enabled: true,
       requests: info.requests, uptimeSeconds: info.uptimeSeconds, cloud: info.cloud,
@@ -87,7 +87,7 @@ async function probe(t) {
     };
   } catch (e) {
     return {
-      name: t.name || 'unnamed-target', healthy: false, latency: null, status: 0,
+      name: t.name || 'unnamed-target', region: t.region, healthy: false, latency: null, status: 0,
       url: target, enabled: true, requests: null, uptimeSeconds: null,
       reason: safeError(e),
     };
@@ -141,7 +141,8 @@ async function provideSnapshot() {
 
   let router = null;
   try {
-    const res = await fetch('https://aegis-router.manav32478.workers.dev/health', {
+    const routerBase = String(process.env.AEGIS_ROUTER_URL || 'https://aegis-router.manav32478.workers.dev').replace(/\/+$/, '');
+    const res = await fetch(routerBase + '/health', {
       signal: AbortSignal.timeout(6000),
     });
     if (res.ok) {
@@ -159,7 +160,19 @@ async function provideSnapshot() {
     warnings.push('Cloudflare router could not be reached: ' + safeError(e));
   }
 
-  const openIncidents = await sb('/rest/v1/incidents?select=*&ended_at=is.null&order=id.asc').catch(() => []);
+  let routerStatus = null;
+  try {
+    const routerBase = String(process.env.AEGIS_ROUTER_URL || 'https://aegis-router.manav32478.workers.dev').replace(/\/+$/, '');
+    const statusRes = await fetch(routerBase + '/router/health', { signal: AbortSignal.timeout(5000) });
+    if (statusRes.ok) routerStatus = await statusRes.json();
+    else warnings.push(`Cloudflare router metadata returned HTTP ${statusRes.status}`);
+  } catch (e) {
+    warnings.push('Cloudflare router metadata could not be reached: ' + safeError(e));
+  }
+
+  let incidentsAvailable = true;
+  let alertsAvailable = true;
+  const openIncidents = await sb('/rest/v1/incidents?select=*&ended_at=is.null&order=id.asc').catch(() => { incidentsAvailable = false; warnings.push('Open incident records are unavailable.'); return []; });
   const proxy = {
     currentCloud: router ? router.serving : null,
     routerAlive: !!router,
@@ -168,8 +181,8 @@ async function provideSnapshot() {
   };
 
   const [incidents, alerts, riskFlags, failover, reports] = await Promise.all([
-    sb('/rest/v1/incidents?select=*&order=id.desc&limit=50').catch(() => []),
-    sb('/rest/v1/alerts?select=*&order=id.desc&limit=50').catch(() => []),
+    sb('/rest/v1/incidents?select=*&order=id.desc&limit=50').catch(() => { incidentsAvailable = false; warnings.push('Incident records are unavailable.'); return []; }),
+    sb('/rest/v1/alerts?select=*&order=id.desc&limit=50').catch(() => { alertsAvailable = false; warnings.push('Alert records are unavailable.'); return []; }),
     sb('/rest/v1/risk_flags?select=*&order=id.desc&limit=50').catch(() => []),
     sb('/rest/v1/failover_events?select=*&order=id.desc&limit=50').catch(() => []),
     sb('/rest/v1/health_reports?select=*&order=id.desc&limit=10').catch(() => []),
@@ -205,11 +218,13 @@ async function provideSnapshot() {
     vantage: MONITOR_REGION,
     diagnostics: {
       historyRows: filtered.length,
+      incidentsAvailable,
+      alertsAvailable,
       targetSource: targetConfig.source,
       targetCount: targetConfig.targets.length,
       warnings,
     },
-    analytics, riskMap, mlScores, series, probes, router, proxy,
+    analytics, riskMap, mlScores, series, probes, router, routerStatus, proxy,
     incidents, openIncidents, alerts, riskFlags, failover, reports, carbon,
     route: decideRoute(analytics, carbonByName), cost, liveCounters,
     monthlyRequests, cloudRunOverage: cloudRun,

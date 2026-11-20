@@ -1,3 +1,5 @@
+> **Redesign handoff:** Start with [START_HERE.md](START_HERE.md) for current setup, testing, deployment and Git instructions. Older content below may be outdated. This remains a prototype; the supplied database policies are not safe for production.
+
 # Aegis — Self-Healing Multi-Cloud Resilience Platform
 
 **Monitor application copies across cloud providers, understand origin health, and demonstrate controlled failover.**

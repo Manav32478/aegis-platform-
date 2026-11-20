@@ -25,9 +25,8 @@ app.use(express.json());
 app.disable('x-powered-by');
 
 const PORT = process.env.PORT || 3100;
-// Default demo token so the admin page works out of the box locally.
-// For any real deployment set ADMIN_TOKEN=your-strong-password.
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'aegis-demo';
+// Admin APIs are disabled until an explicit token is configured.
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
 
 app.use((req, res, next) => {
   res.set('Access-Control-Allow-Origin', '*');
@@ -92,6 +91,7 @@ app.get('/api/diagnostics', async (req, res) => {
       probes: (snapshot.probes || []).map(({ name, enabled, healthy, status, url, reason }) =>
         ({ name, enabled, healthy, status, url, reason })),
       router: snapshot.router ? { serving: snapshot.router.serving, requests: snapshot.router.requests } : null,
+      routerStatus: snapshot.routerStatus ? { cachedTs: snapshot.routerStatus.cachedTs, targets: snapshot.routerStatus.targets || [] } : null,
     });
   } catch (e) {
     res.status(502).json({ error: e.message });
@@ -316,6 +316,19 @@ app.get('/api/security', async (req, res) => {
   }
 });
 
+// ---- multi-page SaaS workspace ----------------------------------------------
+// Each route renders one focused workspace page in the shared navigation shell.
+const workspaceShell = path.join(__dirname, 'public', 'app-shell.html');
+const renderWorkspace = (req, res) => res.sendFile(workspaceShell);
+app.get([
+  '/dashboard', '/dashboard/:section',
+  '/services', '/monitoring', '/incidents', '/routing', '/insights', '/developers', '/settings',
+  '/status',
+], renderWorkspace);
+app.get('/dashboard.html', (req, res) => res.redirect(302, '/dashboard'));
+app.get('/status.html', (req, res) => res.redirect(302, '/status'));
+app.get('/admin', (req, res) => res.redirect(302, '/admin.html'));
+
 // ---- static + health ---------------------------------------------------------
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -339,7 +352,7 @@ app.get('/metrics', async (req, res) => {
 if (require.main === module) {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Aegis web portal on http://localhost:${PORT}`);
-    console.log(`  Landing / · Dashboard /dashboard.html · Status /status.html · Admin /admin.html`);
+    console.log(`  Landing / · Workspace /dashboard · Services /dashboard/services · Status /status · Admin /admin.html`);
     console.log(`  Realtime /api/stream · Badges /badge/:cloud.svg · Export /api/export.csv`);
   });
 }

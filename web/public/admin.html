@@ -12,10 +12,11 @@
 <header class="topbar">
   <a class="brand" href="/"><span class="logo">🛡️</span> Aegis</a>
   <nav class="nav">
-    <a href="/">Overview</a>
-    <a href="/dashboard.html">Dashboard</a>
-    <a href="/status.html">Public Status</a>
-    <a href="/admin.html" class="active">Admin</a>
+    <a href="/">Product site</a>
+    <a href="/dashboard">Workspace</a>
+    <a href="/dashboard/services">Services</a>
+    <a href="/status">Public status</a>
+    <a href="/admin.html" class="active">Administration</a>
   </nav>
   <button class="theme-toggle" id="theme-btn" title="Toggle theme" onclick="Aegis.toggleTheme()">☀️</button>
 </header>
@@ -117,7 +118,7 @@
     try {
       const res = await fetch('/api/admin/targets', { headers: headers() });
       if (res.status === 401) {
-        $('targets-body').innerHTML = '<tr><td class="muted">Set the admin token first (type aegis-demo → Save).</td></tr>';
+        $('targets-body').innerHTML = '<tr><td class="muted">Set a strong ADMIN_TOKEN on the server, then enter it here and select Save.</td></tr>';
         return;
       }
       const data = await res.json();

@@ -18,7 +18,7 @@ services:
       - PORT=3100
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
-      - ADMIN_TOKEN=${ADMIN_TOKEN:-admin}
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-}
     depends_on:
       - api
 
