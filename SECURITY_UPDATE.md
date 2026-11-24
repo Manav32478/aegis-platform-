@@ -1,0 +1,9 @@
+# Dependency security update
+
+This package is based on GitHub commit `08e8a63a4fe8` and addresses the reported HIGH `body-parser` and CRITICAL `proxy-addr` package findings by refreshing lockfiles. The `app`, `api`, `web`, example app and test dependency lockfiles were updated. `app` and `api` use Express 4.22.3 or later within major version 4. The local lockfile resolution selected `body-parser` 1.20.9 and `proxy-addr` 2.0.8. Dockerfiles use `npm ci` and copy their lockfiles so container builds use locked versions; root `.dockerignore` excludes local dependencies and environment files.
+
+Local npm audit at preparation time: app, web, example and tests reported no findings; API reported 3 moderate findings involving the swagger-jsdoc / glob / minimatch chain, and no high or critical findings. Audit results and upstream advisory data change. We did not use `--force`, suppress findings, or claim these remaining findings are fixed. Evaluate the API chain separately before a production release.
+
+All 17 Jest suites and 87 tests passed. Application, portal, API health, and API docs were smoke-tested locally, including an authenticated local demo-key cost route. These are not a full production validation. Trivy and Docker were not available locally, so the GitHub Trivy scans and container builds have not been verified and may report additional findings. Provider deployments, real database writes, routing failover and alert delivery were not tested by this update.
+
+After pushing this update, inspect both GitHub security workflows; their Trivy scan may still report other issues. A push to main may trigger CI, hosting deployments, or configured deployment hooks. Verify provider deployments separately. This project remains a prototype; the existing permissive Supabase policies and other security limitations require remediation.

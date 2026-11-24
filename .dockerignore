@@ -1,0 +1,11 @@
+.git
+**/node_modules
+.env
+.env.*
+**/.env
+**/.env.*
+**/.dev.vars
+.terraform
+**/.terraform
+**/.wrangler
+coverage

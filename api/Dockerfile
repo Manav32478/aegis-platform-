@@ -1,8 +1,8 @@
 # Dockerfile for the Aegis API service (part of docker-compose).
 FROM node:20-alpine
 WORKDIR /api
-COPY api/package.json ./
-RUN npm install --omit=dev
+COPY api/package*.json ./
+RUN npm ci --omit=dev
 COPY api/ ./
 COPY packages/ ../packages/
 COPY intelligence/ ../intelligence/

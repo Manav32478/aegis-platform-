@@ -1,8 +1,8 @@
 # Dockerfile for the Aegis web portal.
 FROM node:20-alpine
 WORKDIR /app
-COPY web/package.json ./
-RUN npm install --omit=dev
+COPY web/package*.json ./
+RUN npm ci --omit=dev
 COPY web/ ./
 COPY packages/ ../packages/
 COPY intelligence/ ../intelligence/
