@@ -12,7 +12,7 @@ This is the current guide for the redesigned version. Older README and files und
 - `orchestration/monitor.js`: probes targets and can write checks, incidents and alerts; optional self-healing and webhooks can cause real actions.
 - `orchestration/router/`: Cloudflare Worker, which probes and proxies requests to healthy targets in configured order. It is a separate deployment from the portal and app.
 - `infra/schema.sql`: original demonstration database schema. Read the security warning below before running it.
-- `tests/`: automated tests. This package's latest local run passed 16 suites / 85 tests; this is not an end-to-end production validation.
+- `tests/`: automated tests. This package's latest local run passed 17 suites / 87 tests; this is not an end-to-end production validation.
 
 The workspace has separate pages for overview, services, monitoring, incidents, alerts, routing, insights, developers, settings and status. Services is a **read-only inventory**. The portal's legacy `/admin.html` can manage database targets when configured; it is not a full application-deployment interface. There is no implemented customer sign-in, billing, tenant isolation, one-click deployment of arbitrary apps, or production SLA. The cost model assumes $0 and is not connected to bills. Historical rows are a limited sample, not a guaranteed uptime measurement. Routing and redeployment must be tested separately.
 

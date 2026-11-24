@@ -78,4 +78,4 @@ The cost model contains assumptions and is not linked to actual invoices; carbon
 
 ## Test and deployment notes
 
-See `START_HERE.md` and `LIVE_TROUBLESHOOTING.md`. As of the local review, `cd tests && npm ci && npm test -- --runInBand` passed 16 suites and 85 tests. UI routes and APIs were smoke checked; this does not cover real provider configuration or end-to-end failover. The latest live monitor run shown in the user-provided evidence was manually triggered. The security/deploy GitHub workflows had failed jobs; inspect their actual run logs rather than claiming CI is entirely green.
+See `START_HERE.md` and `LIVE_TROUBLESHOOTING.md`. As of the local review, `cd tests && npm ci && npm test -- --runInBand` passed 17 suites and 87 tests. UI routes and APIs were smoke checked; this does not cover real provider configuration or end-to-end failover. The latest live monitor run shown in the user-provided evidence was manually triggered. The security/deploy GitHub workflows had failed jobs; inspect their actual run logs rather than claiming CI is entirely green.
