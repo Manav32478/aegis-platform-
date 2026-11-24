@@ -2,7 +2,7 @@
 
 const DEFAULT_TARGETS = [
   { name: 'render', url: 'https://aegis-platform-pomf.onrender.com', region: 'Oregon', enabled: true },
-  { name: 'vercel', url: 'https://aegis-platform-qrhr.vercel.app', region: 'Global edge', enabled: true },
+  { name: 'vercel', url: 'https://aegis-platform-11f7.vercel.app', region: 'Global edge', enabled: true },
   { name: 'google-cloud-run', url: 'https://aegis-app-gcp.a.run.app', region: 'us-central1', enabled: false },
   { name: 'oracle-cloud', url: '', region: 'ap-mumbai-1', enabled: false },
 ];

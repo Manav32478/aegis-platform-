@@ -67,3 +67,7 @@ test('builds a summary with live targets and router status', async () => {
   expect(result.routerStatus.available).toBe(true);
   expect(result.historyAvailable).toBe(false);
 });
+
+test('app fallback targets use the replacement Vercel origin', () => {
+  expect(getTargets({}).find(t => t.name === 'vercel').url).toBe('https://aegis-platform-11f7.vercel.app');
+});

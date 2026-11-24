@@ -1,3 +1,5 @@
+> **Update:** The QRHR URL discussed below is historical. The user deployed `https://aegis-platform-11f7.vercel.app` and updated the Supabase target and Worker dashboard variable. Re-check live status before relying on it.
+
 # Aegis live diagnosis and repair guide
 
 ## What was observed

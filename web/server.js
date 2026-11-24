@@ -139,7 +139,7 @@ app.get('/badge/:cloud.svg', async (req, res) => {
 app.get('/api/serving', async (req, res) => {
   const results = [];
   const urls = [process.env.RENDER_URL || 'https://aegis-platform-pomf.onrender.com',
-    process.env.VERCEL_URL || 'https://aegis-platform-qrhr.vercel.app'];
+    process.env.VERCEL_URL || 'https://aegis-platform-11f7.vercel.app'];
   for (const u of urls) {
     try {
       const r = await fetch(u + '/health', { signal: AbortSignal.timeout(5000) });

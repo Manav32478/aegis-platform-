@@ -28,7 +28,7 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY ||
 // (via env TARGETS, or the admin page).
 const DEFAULT_TARGETS = [
   { name: 'render',           url: 'https://aegis-platform-pomf.onrender.com/health', region: 'oregon',      enabled: true  },
-  { name: 'vercel',           url: 'https://aegis-platform-qrhr.vercel.app/health',  region: 'global edge', enabled: true  },
+  { name: 'vercel',           url: 'https://aegis-platform-11f7.vercel.app/health',  region: 'global edge', enabled: true  },
   { name: 'google-cloud-run', url: 'https://aegis-app-gcp.a.run.app/health',          region: 'us-central1', enabled: false },
   { name: 'oracle-cloud',     url: 'http://YOUR_ORACLE_VM_IP/health',                 region: 'ap-mumbai-1', enabled: false },
 ];

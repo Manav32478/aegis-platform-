@@ -1,3 +1,5 @@
+> **Current demonstration:** See [FACULTY_DEMO_GUIDE.md](FACULTY_DEMO_GUIDE.md). The old QRHR origin has been replaced with the 11f7 origin. Status and URLs below are historical unless independently rechecked.
+
 > **Redesign handoff:** Start with [START_HERE.md](START_HERE.md) for current setup, testing, deployment and Git instructions. Older content below may be outdated. This remains a prototype; the supplied database policies are not safe for production.
 
 # Aegis — Self-Healing Multi-Cloud Resilience Platform

@@ -12,7 +12,7 @@
 
 const DEFAULT_TARGETS = [
   { name: 'render', url: 'https://aegis-platform-pomf.onrender.com' },
-  { name: 'vercel', url: 'https://aegis-platform-qrhr.vercel.app' },
+  { name: 'vercel', url: 'https://aegis-platform-11f7.vercel.app' },
   { name: 'google-cloud-run', url: 'https://aegis-app-gcp.a.run.app', enabled: false },
 ];
 
