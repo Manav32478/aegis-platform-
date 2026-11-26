@@ -1,0 +1,22 @@
+name: Staging monitor (manual only)
+on:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    environment: aegis-staging
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+      - name: Run isolated staging monitor
+        working-directory: orchestration
+        env:
+          AEGIS_MODE: staging
+          SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.STAGING_SUPABASE_KEY }}
+          TARGETS: ${{ secrets.STAGING_TARGETS }}
+          AEGIS_ROUTER_URL: ${{ secrets.STAGING_ROUTER_URL }}
+          MONITOR_REGION: github-staging
+        run: node monitor.js

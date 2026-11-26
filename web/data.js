@@ -9,7 +9,7 @@
 
 const { analyzeHistory } = require('../orchestration/monitor');
 const { getHealthChecks, sb } = require('../packages/common/supabase');
-const { getTargets, MONITOR_REGION } = require('../packages/common/config');
+const { getTargets, MONITOR_REGION, STAGING } = require('../packages/common/config');
 const { detectAnomalies, analyzeSeries } = require('../intelligence/anomaly');
 const { estimateAegisSavings, estimateCloudRunOverage, forecastAnnual, FREE_TIER_LIMITS } = require('../intelligence/cost');
 const { rankRegions } = require('../intelligence/carbon');
@@ -44,6 +44,7 @@ function normalizeTarget(t) {
  * empty, defaults are used; both shapes ({cloud_name} and {name}) are accepted.
  */
 async function resolveTargets() {
+  if (STAGING) return { targets: getTargets().map(normalizeTarget), source: 'environment.staging', warning: null };
   try {
     const rows = await sb('/rest/v1/monitor_targets?select=*&order=id.asc');
     if (Array.isArray(rows) && rows.length) {

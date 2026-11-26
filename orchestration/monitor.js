@@ -13,7 +13,7 @@
 // see .env.example. Also imported by web/app for analytics (pure helpers).
 // ============================================================================
 
-const { getTargets, MONITOR_REGION } = require('../packages/common/config');
+const { getTargets, MONITOR_REGION, STAGING } = require('../packages/common/config');
 const { summarize, analyzeCloud } = require('../packages/common/analytics');
 const { insert, insertReturning, sb, update, insertChecks } = require('../packages/common/supabase');
 
@@ -134,6 +134,7 @@ async function maintainIncidents({ down, results = [] }) {
  * generic webhook (monitoring platforms, ntfy, etc.).
  */
 async function deliverAlerts({ down, degraded }, transitions, results) {
+  if (STAGING) return { events: [], delivered: [] }; // no alert writes or webhooks in staging
   const events = [];
 
   for (const t of transitions) {
@@ -199,7 +200,7 @@ async function deliverAlerts({ down, degraded }, transitions, results) {
 /** Self-heal: if a cloud failed N checks in a row, dispatch a GitHub redeploy. */
 async function maybeSelfHeal(results) {
   const repaired = [];
-  if (!process.env.GITHUB_TOKEN || !process.env.GITHUB_REPO) return repaired;
+  if (STAGING || !process.env.GITHUB_TOKEN || !process.env.GITHUB_REPO) return repaired;
 
   for (const r of results.filter((x) => !x.healthy)) {
     const rows = await sb(
@@ -256,6 +257,7 @@ async function saveResults(results) {
 
 /** Resolve targets: DB (admin-managed) → env TARGETS → defaults. */
 async function resolveTargets() {
+  if (STAGING) return getTargets(); // explicit, isolated targets only; ignore DB-managed targets
   try {
     const rows = await sb('/rest/v1/monitor_targets?select=*&enabled=eq.true&order=id.asc');
     if (Array.isArray(rows) && rows.length) {
@@ -269,6 +271,7 @@ async function resolveTargets() {
 
 async function main() {
   const targets = await resolveTargets();
+  if (STAGING && !targets.length) throw new Error('Staging: no enabled targets');
   const results = [];
   await withLimit(targets, CONCURRENCY, async (t) => {
     results.push(await checkTarget(t));
@@ -283,6 +286,7 @@ async function main() {
 
   const saveMsg = await saveResults(results);
   console.log(`[monitor] ${saveMsg}`);
+  if (STAGING && !saveMsg.startsWith('saved ')) throw new Error('Staging: health checks could not be saved');
 
   const { down, degraded } = detectEvent(results);
   const transitions = await maintainIncidents({ down, results });

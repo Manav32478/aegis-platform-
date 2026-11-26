@@ -4,7 +4,7 @@
 
 Aegis is a **multi-cloud resilience prototype**. A web portal reports the health of application instances deployed on Render and Vercel. A Node monitor probes their `/health` endpoints and, when configured and permitted, stores check records, incidents and alerts in Supabase. A Cloudflare Worker checks origins and proxies traffic to a healthy one. A separate API service provides authenticated endpoints. The interface separates overview, service inventory, monitoring, incidents, alerts, routing, insights, developers, settings and public status.
 
-The real Worker in this version prefers healthy origins in **configured order**; it does not dynamically select the lowest-latency origin or use the dashboard's advisory score. Actual multi-origin failover and automatic redeployment have not been verified end to end. Do not describe the prototype as production-ready, zero-downtime, free under all usage, a fully automatic application-deployment platform or a multi-tenant commercial SaaS.
+The previously deployed live Worker prefers healthy origins in **configured order**; it does not dynamically select the lowest-latency origin or use the dashboard's advisory score. A separate experimental staging Worker in this update has an optional latency mode, but it has not been verified on Cloudflare yet. Actual multi-origin failover and automatic redeployment have not been verified end to end. Do not describe the prototype as production-ready, zero-downtime, free under all usage, a fully automatic application-deployment platform or a multi-tenant commercial SaaS.
 
 ## Demonstration links (check them again on demonstration day)
 
@@ -78,4 +78,4 @@ The cost model contains assumptions and is not linked to actual invoices; carbon
 
 ## Test and deployment notes
 
-See `START_HERE.md` and `LIVE_TROUBLESHOOTING.md`. As of the local review, `cd tests && npm ci && npm test -- --runInBand` passed 17 suites and 87 tests. UI routes and APIs were smoke checked; this does not cover real provider configuration or end-to-end failover. The latest live monitor run shown in the user-provided evidence was manually triggered. The security/deploy GitHub workflows had failed jobs; inspect their actual run logs rather than claiming CI is entirely green.
+See `START_HERE.md` and `LIVE_TROUBLESHOOTING.md`. As of the local review, `cd tests && npm ci && npm test -- --runInBand` passed 17 suites and 87 tests. UI routes and APIs were smoke checked; this does not cover real provider configuration or end-to-end failover. The latest live monitor run shown in the user-provided evidence was manually triggered. GitHub security and deploy workflows passed for commit `33dd051`; inspect the workflow runs for this newer update before claiming it passed. Vercel and Render were observed live on `33dd051`; the later staging update has not yet been deployed or verified. See `STAGING_RUNBOOK.md`.

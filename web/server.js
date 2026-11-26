@@ -15,7 +15,7 @@
 const express = require('express');
 const path = require('path');
 const { sb, insertReturning } = require('../packages/common/supabase');
-const { getTargets, DEFAULT_TARGETS } = require('../packages/common/config');
+const { getTargets, DEFAULT_TARGETS, STAGING } = require('../packages/common/config');
 const { provideSnapshot } = require('./data');
 const realtime = require('./realtime');
 const { publicMetrics } = require('./metrics');
@@ -138,8 +138,9 @@ app.get('/badge/:cloud.svg', async (req, res) => {
 // ---- WHO IS SERVING NOW (raw proxy check — the ultimate failover proof) ----
 app.get('/api/serving', async (req, res) => {
   const results = [];
-  const urls = [process.env.RENDER_URL || 'https://aegis-platform-pomf.onrender.com',
-    process.env.VERCEL_URL || 'https://aegis-platform-11f7.vercel.app'];
+  const urls = STAGING ? getTargets().map(t => t.url.replace(/\/health\/?$/, '')) :
+    [process.env.RENDER_URL || 'https://aegis-platform-pomf.onrender.com',
+      process.env.VERCEL_URL || 'https://aegis-platform-11f7.vercel.app'];
   for (const u of urls) {
     try {
       const r = await fetch(u + '/health', { signal: AbortSignal.timeout(5000) });
@@ -150,7 +151,7 @@ app.get('/api/serving', async (req, res) => {
     } catch { /* skip */ }
   }
   try {
-    const r = await fetch('https://aegis-router.manav32478.workers.dev/health', { signal: AbortSignal.timeout(5000) });
+    const r = await fetch((process.env.AEGIS_ROUTER_URL || 'https://aegis-router.manav32478.workers.dev').replace(/\/+$/, '') + '/health', { signal: AbortSignal.timeout(5000) });
     const j = await r.json();
     results.push({ cloud: j.cloud, requests: j.requests, uptimeSeconds: j.uptimeSeconds, viaRouter: true });
   } catch { /* skip */ }
@@ -218,7 +219,7 @@ app.get('/api/export.json', async (req, res) => {
 
 function requireAdmin(req, res, next) {
   const tok = (req.headers['x-admin-token'] || '').toString();
-  if (!ADMIN_TOKEN || tok !== ADMIN_TOKEN) {
+  if (STAGING || !ADMIN_TOKEN || tok !== ADMIN_TOKEN) {
     return res.status(401).json({ error: 'admin token required (set ADMIN_TOKEN)' });
   }
   next();

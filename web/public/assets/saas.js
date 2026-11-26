@@ -186,7 +186,7 @@
     if (mode === 'portal' && model.historyRows > 0) return '';
     if (mode === 'portal') return '<div class="notice info"><strong>No history rows were returned.</strong> Check the monitor, database and <a href="/api/diagnostics"><strong>diagnostics</strong></a>. This does not prove no checks exist.</div>';
     const portal = safeLink(model.portalUrl);
-    return '<div class="notice info"><strong>Live probes only.</strong> This application origin does not provide stored history or incidents. ' + (portal !== '#' ? '<a href="' + escapeHtml(portal.replace(/\/+$/, '') + '/dashboard') + '"><strong>Open the control-plane portal ↗</strong></a>' : 'Open the control-plane portal to view stored history.') + '</div>'; 
+    return '<div class="notice info"><strong>Live probes only.</strong> This application origin does not provide stored history or incidents. ' + (portal !== '#' ? '<a href="' + escapeHtml(portal.replace(/\/+$/, '') + '/dashboard') + '"><strong>Open the control-plane portal ↗</strong></a>' : 'Open the control-plane portal to view stored history.') + '</div>';
   }
 
   function renderOverview(model) {
@@ -206,7 +206,7 @@
     html += '<section class="grid two-grid"><div class="panel"><div class="panel-head"><div><h2>Application origins</h2><p>Latest health result by configured target</p></div><a class="button small" href="/dashboard/services">View services →</a></div>' + originTable(model.origins, 5) + '</div>';
     html += '<div class="panel"><div class="panel-head"><div><h2>Operational notes</h2><p>What the current data can and cannot tell you</p></div></div>' +
       '<div class="setting-row"><div><strong>Last refresh</strong><p>' + escapeHtml(formatTime(model.checkedAt)) + '</p></div><span class="subtle-pill">' + (lastError ? 'Stale' : 'Snapshot') + '</span></div>' +
-      '<div class="setting-row"><div><strong>Routing mode</strong><p>Worker source: healthy origins in configured order; verify deployed Worker.</p></div></div>' +
+      '<div class="setting-row"><div><strong>Routing mode</strong><p>' + escapeHtml(model.routerStatus && model.routerStatus.mode ? model.routerStatus.mode + ' (reported by Worker)' : 'Not reported; verify deployed Worker configuration') + '</p></div></div>' +
       '<div class="setting-row"><div><strong>Availability target</strong><p>For comparison only; no SLA is configured.</p></div></div>' +
       (mode === 'portal' && (model.diagnostics.warnings || []).length ? '<div class="notice" style="margin-top:14px">' + escapeHtml(model.diagnostics.warnings.join(' · ')) + ' <a href="/api/diagnostics"><strong>Diagnostics ↗</strong></a></div>' : '<div class="callout" style="margin-top:14px">Aegis is an evaluation prototype. Run a controlled staging test before making a failover or availability claim.</div>') +
       '</div></section>';
@@ -217,6 +217,7 @@
   function renderServices(model) {
     let html = header('services', '<button class="button" data-refresh>↻ Refresh probes</button>') + noHistoryNote(model);
     html += '<div class="panel"><div class="panel-head"><div><h2>Configured origins</h2><p>Disabled entries are shown as planned and are not included in the live health count.</p></div><span class="subtle-pill">' + activeOrigins(model).length + ' enabled</span></div>' + originsCards(model.origins) + '</div>';
+    if (mode === 'portal') html += '<div class="panel"><div class="panel-head"><div><h2>Add an application</h2><p>Generate staging configuration for two existing deployments. No deployment or changes happen automatically.</p></div><a class="button small" href="/onboarding.html">Open setup guide →</a></div></div>';
     html += '<div class="panel"><div class="panel-head"><div><h2>Health contract</h2><p>Read-only inventory. In the portal use Settings → administration to edit database-managed targets; the Worker has separate target configuration.</p></div></div><div class="codebox">GET /health<br>Accept: application/json<br><br>{ "status": "ok", "cloud": "origin-name", "timestamp": "..." }</div></div>';
     return html;
   }
@@ -286,7 +287,7 @@
     const router = model.routerStatus || model.router || {};
     const routerTargets = Array.isArray(router.targets) ? router.targets : [];
     let html = header('routing');
-    html += '<div class="notice"><strong>Routing policy:</strong> the current Worker source prefers healthy origins in configured order. The dashboard’s composite health ranking is advisory and is not the Worker’s selection algorithm.</div>';
+    html += '<div class="notice"><strong>Routing policy:</strong> ' + escapeHtml(router.mode ? ('Worker reports ' + router.mode + ' mode. Latency mode is experimental and per edge instance.') : 'Mode not reported; verify the deployed Worker. The legacy Worker uses configured priority.') + ' Dashboard rankings are advisory, not proof of routing decisions.</div>';
     html += '<div class="grid two-grid"><div class="panel"><div class="panel-head"><div><h2>Origin eligibility</h2><p>Eligibility is based on the latest probe data available to this page.</p></div></div>'+originTable(model.origins)+'</div>';
     html += '<div class="panel"><div class="panel-head"><div><h2>Router diagnostics</h2><p>Worker metadata, when reachable.</p></div></div>';
     if (routerTargets.length) {

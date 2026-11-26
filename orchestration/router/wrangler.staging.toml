@@ -1,0 +1,6 @@
+# Use --name to create a NEW Worker; never deploy this config over the live router.
+name = "aegis-staging-experimental"
+main = "src/staging-worker.js"
+compatibility_date = "2024-11-01"
+# No cron, Supabase credentials, production origins, or deployment hooks.
+keep_vars = true
